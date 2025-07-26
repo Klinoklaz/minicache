@@ -1,0 +1,14 @@
+{
+    "local_addr": ":9999",
+    "target_addr": "http://127.0.0.1:2323",
+    "log_file": "",
+    "log_level": "error",
+    "cache_unique": true,
+    "cache_mobile": true,
+    "cache_size": 419430400,
+    "non_get_mode": "pass",
+    "queue_length": 50,
+    "queue_size": 5242880,
+    "dequeue_rate": 2,
+    "protection_expire": 30
+}
