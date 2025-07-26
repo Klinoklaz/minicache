@@ -89,7 +89,7 @@ var (
 		li  lru
 		mtx sync.Mutex
 	}
-)
+) // any routine that acquires multiple locks must conform to this order: cachePool, protected, lruContainer
 
 func keygen(r *http.Request) string {
 	if ConfGlobal.CacheMobile && strings.Contains(r.Header.Get("User-Agent"), "Mobi") {
@@ -135,7 +135,6 @@ func NewFromRequest(r *http.Request) (*Cache, *http.Response) {
 }
 
 // move stale cache from protected list to LRU list.
-// will lock protected list then lock LRU list
 func cacheStale() {
 	for {
 		time.Sleep(time.Duration(30) * time.Second) // could be configurable, but seems trivial
@@ -158,11 +157,10 @@ func cacheStale() {
 }
 
 // remove least recent used cache from pool.
-// will lock LRU list then lock cache pool
 func lruEvict() {
 	for range cachePool.evictorWakeup {
-		lruContainer.mtx.Lock()
 		cachePool.mtx.Lock()
+		lruContainer.mtx.Lock()
 
 		for cachePool.size > ConfGlobal.CacheSize && len(lruContainer.li) > 1 {
 			c := lruContainer.li[1]
