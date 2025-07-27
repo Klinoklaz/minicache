@@ -270,7 +270,7 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 
 				// if we allowed new cache to be created here,
 				// protected list could grow infinitely before anything being moved to LRU list
-				Log("New cache can not be added because cache pool is already full.", LOG_INFO)
+				Log("New cache can not be added because cache pool is already full.", LOG_NOTICE)
 			}
 
 			return c, res

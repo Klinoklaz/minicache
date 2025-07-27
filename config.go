@@ -66,7 +66,7 @@ func LoadConfFile(file string) {
 	case "debug":
 		ConfGlobal.LogLevel = LOG_DEBUG
 	case "info":
-		ConfGlobal.LogLevel = LOG_INFO
+		ConfGlobal.LogLevel = LOG_NOTICE
 	case "warning":
 		ConfGlobal.LogLevel = LOG_WARN
 	case "error":
@@ -91,5 +91,5 @@ func LoadConfFile(file string) {
 		ConfGlobal.ProtectionExpire = time.Duration(jsonData.EX) * time.Minute
 	}
 
-	Log(fmt.Sprintf("Loaded config JSON: %v, current ConfGlobal: %v", jsonData, ConfGlobal), LOG_INFO)
+	Log(fmt.Sprintf("Loaded config JSON: %v, current ConfGlobal: %v", jsonData, ConfGlobal), LOG_NOTICE)
 }
