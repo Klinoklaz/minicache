@@ -16,6 +16,8 @@ func main() {
 		helper.LoadConfFile(confFile)
 	}
 
+	cache.Init()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", proxy)
 	log.Fatalln(http.ListenAndServe(helper.Config.LocalAddr, mux))

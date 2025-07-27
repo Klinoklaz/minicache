@@ -32,7 +32,8 @@ var cachePool struct {
 	evictorWakeup chan bool
 }
 
-func init() {
+// can not rely on package init cuz we have to wait for config to be loaded
+func Init() {
 	cachePool.evictorWakeup = make(chan bool)
 	cachePool.pool = make(map[string]*Cache)
 	if helper.Config.CacheUnique {
@@ -147,25 +148,29 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 		}
 	}
 
-	if time.Since(c.protectedAt) > helper.Config.LruTime {
-		// restart access count tracking
-		protect(c)
+	// track access count
+	if time.Since(c.protectedAt) > helper.Config.LruTime { // restart tracking
+		id := c.index // FIXME: race
+		if id != PROTECT {
+			protect(c)
+		}
 
 		lruList.mtx.Lock()
-
 		c.accessCnt = 1
-		id := c.index
-		lruList.li.swap(c.index, len(lruList.li)-1)
-		lruList.li = lruList.li[:len(lruList.li)-1]
-		lruList.li.fix(id)
 
+		if id != PROTECT {
+			// rearrange LRU list since the entry was moved back to protection
+			lruList.li.swap(id, len(lruList.li)-1)
+			lruList.li = lruList.li[:len(lruList.li)-1]
+			lruList.li.fix(id)
+		}
 		lruList.mtx.Unlock()
 	} else {
 		lruList.mtx.Lock()
-
 		c.accessCnt++
-		lruList.li.down(c)
-
+		if c.index != PROTECT {
+			lruList.li.down(c)
+		}
 		lruList.mtx.Unlock()
 	}
 

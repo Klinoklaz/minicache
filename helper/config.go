@@ -26,7 +26,7 @@ type config struct {
 	QueueLength      int           `json:"queue_length"` // Queue at most this number of requests for `non_get_mode=queue`. Otherwise has no effect
 	QueueSize        int           `json:"queue_size"`   // Max queue size in bytes for `non_get_mode=queue`, default 1 MB. Otherwise has no effect
 	DequeueRate      int           `json:"dequeue_rate"` // Dequeue and forward this number of queued requests per second when `non_get_mode=queue`
-	LruTime          time.Duration // track access count in this time period (minutes) for each entry of LRU list
+	LruTime          time.Duration // track access count within this time period (minutes) for each cache entry
 	ProtectionExpire time.Duration // Fresh requests will go stale and fall into LRU list after this much of time (minutes)
 	// TODO: support cache TTL, manual cache deleting
 }

@@ -82,10 +82,12 @@ var (
 	}
 )
 
+const PROTECT int = -1
+
 // add cache entry to proteced list
 func protect(c *Cache) {
 	c.protectedAt = time.Now()
-	c.index = -1
+	c.index = PROTECT
 
 	protectList.mtx.Lock()
 	protectList.li.PushBack(c)
