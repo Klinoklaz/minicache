@@ -69,6 +69,20 @@ func (l lru) down(c *Cache) {
 	}
 }
 
+func (l lru) fix(i int) {
+	pi := i >> 1 // parent
+
+	if i < 1 || i >= len(l) {
+		return
+	}
+
+	if pi > 0 && l[i].accessCnt < l[pi].accessCnt {
+		l.up(l[i])
+	} else {
+		l.down(l[i])
+	}
+}
+
 var (
 	cachePool struct {
 		pool          map[string]*Cache
@@ -183,6 +197,15 @@ func lruEvict() {
 	}
 }
 
+func protect(c *Cache) {
+	c.protectedAt = time.Now()
+	c.index = -1
+
+	protected.mtx.Lock()
+	protected.li.PushBack(c)
+	protected.mtx.Unlock()
+}
+
 func Init() {
 	cachePool.evictorWakeup = make(chan bool)
 	cachePool.pool = make(map[string]*Cache)
@@ -225,13 +248,10 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 		if c == nil {
 			c, res := NewFromRequest(r)
 
-			if cachePool.size <= ConfGlobal.CacheSize {
-				c.protectedAt = time.Now()
-				c.index = -1
-
-				protected.mtx.Lock()
-				protected.li.PushBack(c)
-				protected.mtx.Unlock()
+			if res.StatusCode != http.StatusOK {
+				cachePool.mtx.Unlock()
+			} else if cachePool.size <= ConfGlobal.CacheSize {
+				protect(c)
 
 				if ConfGlobal.CacheUnique {
 					hash := md5.Sum(c.Content)
@@ -241,6 +261,7 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 				} else {
 					cachePool.pool[c.key] = c
 				}
+
 				cachePool.size += len(c.Content)
 				cachePool.mtx.Unlock()
 			} else {
@@ -256,7 +277,28 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 		}
 	}
 
-	c.accessCnt++ // TODO clear this value and move cache back to protected list after certain amount of time
+	if time.Since(c.protectedAt) > ConfGlobal.LruTime {
+		// restart access count tracking
+		protect(c)
+
+		lruContainer.mtx.Lock()
+
+		c.accessCnt = 1
+		id := c.index
+		lruContainer.li.swap(c.index, len(lruContainer.li)-1)
+		lruContainer.li = lruContainer.li[:len(lruContainer.li)-1]
+		lruContainer.li.fix(id)
+
+		lruContainer.mtx.Unlock()
+	} else {
+		lruContainer.mtx.Lock()
+
+		c.accessCnt++
+		lruContainer.li.down(c)
+
+		lruContainer.mtx.Unlock()
+	}
+
 	cachePool.mtx.Unlock()
 	return c, nil
 }

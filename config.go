@@ -26,6 +26,7 @@ type Config struct {
 	QueueLength      int           `json:"queue_length"` // Queue at most this number of requests for `non_get_mode=queue`. Otherwise has no effect
 	QueueSize        int           `json:"queue_size"`   // Max queue size in bytes for `non_get_mode=queue`, default 1 MB. Otherwise has no effect
 	DequeueRate      int           `json:"dequeue_rate"` // Dequeue and forward this number of queued requests per second when `non_get_mode=queue`
+	LruTime          time.Duration // track access count in this time period (minutes) for each entry of LRU list
 	ProtectionExpire time.Duration // Fresh requests will go stale and fall into LRU list after this much of time (minutes)
 	// TODO support cache expiration time
 }
@@ -36,6 +37,7 @@ var ConfGlobal Config = Config{
 	CacheSize:        1 << 30,
 	NonGetMode:       MODE_PASS,
 	QueueSize:        1 << 20,
+	LruTime:          time.Duration(30) * time.Minute,
 	ProtectionExpire: time.Duration(30) * time.Minute,
 }
 
@@ -50,6 +52,7 @@ func LoadConfFile(file string) {
 		*Config
 		LL string `json:"log_level"`
 		NG string `json:"non_get_mode"`
+		LT int    `json:"lru_time"`
 		EX int    `json:"protection_expire"`
 	}{Config: &ConfGlobal}
 
@@ -81,6 +84,9 @@ func LoadConfFile(file string) {
 		ConfGlobal.NonGetMode = MODE_QUEUE
 	}
 
+	if jsonData.LT > 0 {
+		ConfGlobal.LruTime = time.Duration(jsonData.LT) * time.Minute
+	}
 	if jsonData.EX > 0 {
 		ConfGlobal.ProtectionExpire = time.Duration(jsonData.EX) * time.Minute
 	}
