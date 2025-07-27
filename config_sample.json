@@ -10,5 +10,6 @@
     "queue_length": 50,
     "queue_size": 5242880,
     "dequeue_rate": 2,
+    "lru_time": 60,
     "protection_expire": 30
 }

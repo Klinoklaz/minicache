@@ -1,4 +1,4 @@
-package main
+package helper
 
 import (
 	"encoding/json"
@@ -14,7 +14,7 @@ const (
 	MODE_QUEUE byte = 'Q'
 )
 
-type Config struct {
+type config struct {
 	LocalAddr        string        `json:"local_addr"`  // Local listening address
 	TargetAddr       string        `json:"target_addr"` // Proxy target
 	LogFile          string        `json:"log_file"`    // Specify a log destination
@@ -31,7 +31,7 @@ type Config struct {
 	// TODO: support cache TTL, manual cache deleting
 }
 
-var ConfGlobal Config = Config{
+var Config config = config{
 	LocalAddr:        ":80",
 	LogLevel:         LOG_WARN,
 	CacheSize:        1 << 30,
@@ -49,12 +49,12 @@ func LoadConfFile(file string) {
 	}
 
 	jsonData := struct {
-		*Config
+		*config
 		LL string `json:"log_level"`
 		NG string `json:"non_get_mode"`
 		LT int    `json:"lru_time"`
 		EX int    `json:"protection_expire"`
-	}{Config: &ConfGlobal}
+	}{config: &Config}
 
 	err = json.Unmarshal(data, &jsonData)
 	if err != nil {
@@ -64,32 +64,32 @@ func LoadConfFile(file string) {
 
 	switch jsonData.LL {
 	case "debug":
-		ConfGlobal.LogLevel = LOG_DEBUG
+		Config.LogLevel = LOG_DEBUG
 	case "info":
-		ConfGlobal.LogLevel = LOG_NOTICE
+		Config.LogLevel = LOG_NOTICE
 	case "warning":
-		ConfGlobal.LogLevel = LOG_WARN
+		Config.LogLevel = LOG_WARN
 	case "error":
-		ConfGlobal.LogLevel = LOG_ERR
+		Config.LogLevel = LOG_ERR
 	}
 
 	switch jsonData.NG {
 	case "pass":
-		ConfGlobal.NonGetMode = MODE_PASS
+		Config.NonGetMode = MODE_PASS
 	case "block":
-		ConfGlobal.NonGetMode = MODE_BLOCK
+		Config.NonGetMode = MODE_BLOCK
 	case "cache":
-		ConfGlobal.NonGetMode = MODE_CACHE
+		Config.NonGetMode = MODE_CACHE
 	case "queue":
-		ConfGlobal.NonGetMode = MODE_QUEUE
+		Config.NonGetMode = MODE_QUEUE
 	}
 
 	if jsonData.LT > 0 {
-		ConfGlobal.LruTime = time.Duration(jsonData.LT) * time.Minute
+		Config.LruTime = time.Duration(jsonData.LT) * time.Minute
 	}
 	if jsonData.EX > 0 {
-		ConfGlobal.ProtectionExpire = time.Duration(jsonData.EX) * time.Minute
+		Config.ProtectionExpire = time.Duration(jsonData.EX) * time.Minute
 	}
 
-	Log(fmt.Sprintf("Loaded config JSON: %v, current ConfGlobal: %v", jsonData, ConfGlobal), LOG_NOTICE)
+	Log(fmt.Sprintf("Loaded config JSON: %v, current ConfGlobal: %v", jsonData, Config), LOG_NOTICE)
 }

@@ -1,4 +1,4 @@
-package main
+package helper
 
 const (
 	LOG_DEBUG  byte = 'D'
