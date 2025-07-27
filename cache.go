@@ -35,38 +35,37 @@ func (l lru) swap(i, j int) {
 }
 
 func (l lru) up(c *Cache) {
-	id, pid := c.index, c.index>>1 // i*2 and i*2+1 is node i's two children
+	id, pid := c.index, c.index>>1 // i*2 and i*2+1 are node i's two children
 
-	if id < 1 || pid < 1 {
-		return
-	}
-
-	if c.accessCnt < l[pid].accessCnt {
+	for id > 0 && pid > 0 && c.accessCnt < l[pid].accessCnt {
 		l.swap(id, pid)
-		l.up(l[pid])
+		id, pid = pid, pid>>1
 	}
 }
 
-func (l lru) down(c *Cache) { // TODO don't use recursion
+func (l lru) down(c *Cache) {
 	left := c.index << 1 // is overflow a real concern?
 	right := left + 1
 
-	if left >= len(l) || left < 1 {
-		return
-	}
-
-	// swap with least child
-	if c.accessCnt > l[left].accessCnt {
-		if right < len(l) && l[right].accessCnt < l[left].accessCnt {
+	for left < len(l) && left > 0 {
+		// swap with least child
+		if c.accessCnt > l[left].accessCnt {
+			if right < len(l) && l[right].accessCnt < l[left].accessCnt {
+				l.swap(c.index, right)
+				left = right << 1
+				right = left + 1
+			} else {
+				l.swap(c.index, left)
+				left = left << 1
+				right = left + 1
+			}
+		} else if right < len(l) && c.accessCnt > l[right].accessCnt {
 			l.swap(c.index, right)
-			l.down(l[right])
+			left = right << 1
+			right = left + 1
 		} else {
-			l.swap(c.index, left)
-			l.down(l[left])
+			break
 		}
-	} else if right < len(l) && c.accessCnt > l[right].accessCnt {
-		l.swap(c.index, right)
-		l.down(l[right])
 	}
 }
 
