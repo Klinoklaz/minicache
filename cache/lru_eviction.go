@@ -37,19 +37,18 @@ func (l lru) down(c *Cache) {
 			if right < len(l) && l[right].accessCnt < l[left].accessCnt {
 				l.swap(c.index, right)
 				left = right << 1
-				right = left + 1
 			} else {
 				l.swap(c.index, left)
 				left = left << 1
-				right = left + 1
 			}
 		} else if right < len(l) && c.accessCnt > l[right].accessCnt {
 			l.swap(c.index, right)
 			left = right << 1
-			right = left + 1
 		} else {
 			break
 		}
+
+		right = left + 1
 	}
 }
 
