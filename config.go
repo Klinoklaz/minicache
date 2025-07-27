@@ -28,7 +28,7 @@ type Config struct {
 	DequeueRate      int           `json:"dequeue_rate"` // Dequeue and forward this number of queued requests per second when `non_get_mode=queue`
 	LruTime          time.Duration // track access count in this time period (minutes) for each entry of LRU list
 	ProtectionExpire time.Duration // Fresh requests will go stale and fall into LRU list after this much of time (minutes)
-	// TODO support cache expiration time
+	// TODO: support cache TTL, manual cache deleting
 }
 
 var ConfGlobal Config = Config{
