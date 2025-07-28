@@ -1,11 +1,11 @@
 package helper
 
 const (
-	LOG_DEBUG  byte = 'D'
-	LOG_NOTICE byte = 'N'
-	LOG_WARN   byte = 'W'
-	LOG_ERR    byte = 'E'
-	LOG_FATAL  byte = 'F'
+	LogDebug byte = 'D'
+	LogInfo  byte = 'I'
+	LogWarn  byte = 'W'
+	LogErr   byte = 'E'
+	LogFatal byte = 'F'
 )
 
 func Log(info string, level byte) {

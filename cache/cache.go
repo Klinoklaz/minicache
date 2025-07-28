@@ -3,7 +3,6 @@ package cache
 import (
 	"container/list"
 	"crypto/md5"
-	"encoding/hex"
 	"io"
 	"net/http"
 	"strings"
@@ -17,18 +16,27 @@ type Cache struct {
 	Header  http.Header
 	Content []byte
 
+	ready       chan bool
 	key         string // cache pool key
-	accessCnt   uint
-	hash        string // store content hash in deduplicate mode
-	index       int    // position in the LRU list
+	accessCnt   int
+	hash        [16]byte
+	status      byte
 	protectedAt time.Time
 }
+
+// cache entry status
+const (
+	fresh   byte = 'f'
+	protect byte = 'p'
+	stale   byte = 's'
+	invalid byte = 'i'
+)
 
 var cachePool struct {
 	pool          map[string]*Cache
 	size          int
-	mtx           sync.RWMutex      // must be locked before protected list and LRU list
-	hashes        map[string]string // store url => content hash in deduplicate mode
+	mtx           sync.RWMutex
+	hashes        map[[16]byte]*Cache // stores content md5 sum in deduplicate mode
 	evictorWakeup chan bool
 }
 
@@ -37,11 +45,10 @@ func Init() {
 	cachePool.evictorWakeup = make(chan bool)
 	cachePool.pool = make(map[string]*Cache)
 	if helper.Config.CacheUnique {
-		cachePool.hashes = make(map[string]string)
+		cachePool.hashes = make(map[[16]byte]*Cache)
 	}
 
 	protectList.li = list.New()
-	lruList.li = lru{nil} // index 0 should never be used
 	go lruEvict()
 	go cacheStale()
 }
@@ -53,12 +60,12 @@ func keygen(r *http.Request) string {
 	return r.RequestURI
 }
 
-// forwad request to proxy target and create a Cache struct using the response
-func NewFromRequest(r *http.Request) (*Cache, *http.Response) {
+// forwads request to proxy target and fills up c's fields using the response
+func (c *Cache) newRequest(r *http.Request) *http.Response {
 	fReq, err := http.NewRequest(r.Method, helper.Config.TargetAddr+r.RequestURI, nil)
 	if err != nil {
-		helper.Log("", helper.LOG_ERR)
-		return nil, nil
+		helper.Log("", helper.LogErr)
+		return nil
 	}
 
 	for h := range r.Header {
@@ -67,40 +74,30 @@ func NewFromRequest(r *http.Request) (*Cache, *http.Response) {
 
 	res, err := http.DefaultClient.Do(fReq)
 	if err != nil {
-		helper.Log("", helper.LOG_ERR)
-		return nil, nil
+		helper.Log("", helper.LogErr)
+		return nil
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != http.StatusOK {
+		c.status = invalid
+	} else {
+		c.status = fresh
+	}
+
+	c.accessCnt = 1
 	res.Header.Del("Set-Cookie")
 	res.Header.Del("Expires")
-
-	c := &Cache{
-		accessCnt: 1,
-		key:       keygen(r),
-		Header:    res.Header.Clone(),
-	}
+	c.Header = res.Header.Clone()
 
 	c.Content, err = io.ReadAll(res.Body)
 	if err != nil {
-		helper.Log("", helper.LOG_ERR) // this kind of error handling is C style, probably should use errors.As
+		helper.Log("", helper.LogErr) // this kind of error handling looks like C style, probably shouldn't do that
+	} else if helper.Config.CacheUnique {
+		c.hash = md5.Sum(c.Content)
 	}
 
-	return c, res
-}
-
-func get(key string) *Cache {
-	var c *Cache
-
-	if helper.Config.CacheUnique {
-		if hash, ok := cachePool.hashes[key]; ok {
-			c = cachePool.pool[hash]
-		}
-	} else {
-		c = cachePool.pool[key]
-	}
-
-	return c
+	return res
 }
 
 // get cache entry
@@ -108,72 +105,85 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 	key := keygen(r)
 
 	cachePool.mtx.RLock()
-	c := get(key)
+	c := cachePool.pool[key]
 
-	if c == nil {
+	if c != nil && c.status != invalid {
+		countAccess(c)
+		cachePool.mtx.RUnlock()
+		return c, nil
+	}
+
+	cachePool.mtx.RUnlock()
+	cachePool.mtx.Lock()
+
+	// check again since there's a time window in lock escalation
+	c = cachePool.pool[key]
+	if c != nil && c.status != invalid {
+		countAccess(c)
 		cachePool.mtx.Unlock()
-		cachePool.mtx.Lock()
-
-		c = get(key) // check again since there's a time window in lock escalation
-
-		if c == nil {
-			c, res := NewFromRequest(r)
-
-			if res.StatusCode != http.StatusOK {
-				cachePool.mtx.Unlock()
-			} else if cachePool.size <= helper.Config.CacheSize {
-				protect(c)
-
-				if helper.Config.CacheUnique {
-					hash := md5.Sum(c.Content)
-					c.hash = hex.EncodeToString(hash[:])
-					cachePool.pool[c.hash] = c
-					cachePool.hashes[key] = c.hash
-				} else {
-					cachePool.pool[c.key] = c
-				}
-
-				cachePool.size += len(c.Content)
-				cachePool.mtx.Unlock()
-			} else {
-				cachePool.mtx.Unlock()
-				go func() { cachePool.evictorWakeup <- true }()
-
-				// if we allowed new cache to be created here,
-				// protected list could grow infinitely before anything being moved to LRU list
-				helper.Log("New cache can not be added because cache pool is already full.", helper.LOG_NOTICE)
-			}
-
-			return c, res
-		}
+		return c, nil
 	}
 
-	// track access count
-	if time.Since(c.protectedAt) > helper.Config.LruTime { // restart tracking
-		id := c.index // FIXME: race
-		if id != PROTECT {
-			protect(c)
-		}
-
-		lruList.mtx.Lock()
-		c.accessCnt = 1
-
-		if id != PROTECT {
-			// rearrange LRU list since the entry was moved back to protection
-			lruList.li.swap(id, len(lruList.li)-1)
-			lruList.li = lruList.li[:len(lruList.li)-1]
-			lruList.li.fix(id)
-		}
-		lruList.mtx.Unlock()
-	} else {
-		lruList.mtx.Lock()
-		c.accessCnt++
-		if c.index != PROTECT {
-			lruList.li.down(c)
-		}
-		lruList.mtx.Unlock()
-	}
-
+	// first request or retry
+	c = &Cache{ready: make(chan bool), key: key}
+	cachePool.pool[key] = c
 	cachePool.mtx.Unlock()
-	return c, nil
+
+	res := c.newRequest(r)
+	close(c.ready)
+
+	if c.status != invalid && cachePool.size < helper.Config.CacheSize {
+		accept(c)
+	} else {
+		go func() { cachePool.evictorWakeup <- true }()
+		// if we allow new cache to be accepted here,
+		// protected list may grow infinitely before anything being moved to LRU list
+		cachePool.mtx.Lock()
+		delete(cachePool.pool, key)
+		cachePool.mtx.Unlock()
+		helper.Log("New cache can not be added because cache pool is already full.", helper.LogInfo)
+	}
+
+	return c, res
+}
+
+func accept(c *Cache) {
+	protectList.protect(c)
+
+	cachePool.mtx.Lock()
+	defer cachePool.mtx.Unlock()
+
+	cachePool.size += len(c.Content)
+
+	if !helper.Config.CacheUnique {
+		return
+	}
+
+	// ensure same response data being added only once to the pool
+	if cc, ok := cachePool.hashes[c.hash]; ok {
+		cachePool.pool[c.key] = cc
+	} else {
+		cachePool.hashes[c.hash] = c
+	}
+}
+
+func countAccess(c *Cache) {
+	<-c.ready
+
+	// access count doesn't need to be accurate, so no locking on individual entry
+	if time.Since(c.protectedAt) <= helper.Config.LruTime {
+		c.accessCnt++
+		return
+	}
+
+	c.accessCnt = 1
+	if c.status != protect {
+		// NOTE: race, potentially can cause duplicated entries in the list,
+		// but kinda ok
+		reprotectList.protect(c)
+
+		lruList.mtx.Lock()
+		lruList.li = lruList.li[:len(lruList.li)-1]
+		lruList.mtx.Unlock()
+	}
 }
