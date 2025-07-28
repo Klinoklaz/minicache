@@ -8,10 +8,10 @@ import (
 )
 
 const (
-	MODE_PASS  byte = 'P'
-	MODE_BLOCK byte = 'B'
-	MODE_CACHE byte = 'C'
-	MODE_QUEUE byte = 'Q'
+	ModePass  byte = 'P'
+	ModeBlock byte = 'B'
+	ModeCache byte = 'C'
+	ModeQueue byte = 'Q'
 )
 
 type config struct {
@@ -33,9 +33,9 @@ type config struct {
 
 var Config config = config{
 	LocalAddr:        ":80",
-	LogLevel:         LOG_WARN,
+	LogLevel:         LogWarn,
 	CacheSize:        1 << 30,
-	NonGetMode:       MODE_PASS,
+	NonGetMode:       ModePass,
 	QueueSize:        1 << 20,
 	LruTime:          time.Duration(30) * time.Minute,
 	ProtectionExpire: time.Duration(30) * time.Minute,
@@ -44,7 +44,7 @@ var Config config = config{
 func LoadConfFile(file string) {
 	data, err := os.ReadFile(file)
 	if err != nil {
-		Log("", LOG_WARN)
+		Log("", LogWarn)
 		return
 	}
 
@@ -58,30 +58,30 @@ func LoadConfFile(file string) {
 
 	err = json.Unmarshal(data, &jsonData)
 	if err != nil {
-		Log("", LOG_WARN)
+		Log("", LogWarn)
 		return
 	}
 
 	switch jsonData.LL {
 	case "debug":
-		Config.LogLevel = LOG_DEBUG
+		Config.LogLevel = LogDebug
 	case "info":
-		Config.LogLevel = LOG_NOTICE
+		Config.LogLevel = LogInfo
 	case "warning":
-		Config.LogLevel = LOG_WARN
+		Config.LogLevel = LogWarn
 	case "error":
-		Config.LogLevel = LOG_ERR
+		Config.LogLevel = LogErr
 	}
 
 	switch jsonData.NG {
 	case "pass":
-		Config.NonGetMode = MODE_PASS
+		Config.NonGetMode = ModePass
 	case "block":
-		Config.NonGetMode = MODE_BLOCK
+		Config.NonGetMode = ModeBlock
 	case "cache":
-		Config.NonGetMode = MODE_CACHE
+		Config.NonGetMode = ModeCache
 	case "queue":
-		Config.NonGetMode = MODE_QUEUE
+		Config.NonGetMode = ModeQueue
 	}
 
 	if jsonData.LT > 0 {
@@ -91,5 +91,5 @@ func LoadConfFile(file string) {
 		Config.ProtectionExpire = time.Duration(jsonData.EX) * time.Minute
 	}
 
-	Log(fmt.Sprintf("Loaded config JSON: %v, current ConfGlobal: %v", jsonData, Config), LOG_NOTICE)
+	Log(fmt.Sprintf("Loaded config JSON: %v, current ConfGlobal: %v", jsonData, Config), LogInfo)
 }

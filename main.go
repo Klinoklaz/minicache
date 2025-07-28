@@ -47,6 +47,6 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 
 	_, err := w.Write(c.Content)
 	if err != nil {
-		helper.Log("", helper.LOG_ERR)
+		helper.Log("", helper.LogErr)
 	}
 }
