@@ -19,7 +19,8 @@ type evicting struct {
 	mtx sync.Mutex
 }
 
-// protect cache entry from LRU eviction
+// protect cache entry from LRU eviction.
+// don't put this inside cache pool mutex's critical area
 func (p *protecting) protect(c *Cache) {
 	c.protectedAt = time.Now()
 	c.status = protect
@@ -80,7 +81,9 @@ func lruEvict() {
 		for cachePool.size > helper.Config.CacheSize && len(lruList.li) > 0 {
 			c := lruList.li[len(lruList.li)-1]
 
-			delete(cachePool.pool, c.key)
+			for _, key := range c.keys {
+				delete(cachePool.pool, key)
+			}
 			if helper.Config.CacheUnique {
 				delete(cachePool.hashes, c.hash)
 			}

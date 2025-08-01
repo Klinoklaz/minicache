@@ -17,7 +17,7 @@ type Cache struct {
 	Content []byte
 
 	ready       chan bool
-	key         string // cache pool key
+	keys        []string // cache pool key
 	accessCnt   int
 	hash        [16]byte
 	status      byte
@@ -60,7 +60,7 @@ func keygen(r *http.Request) string {
 	return r.RequestURI
 }
 
-// forwads request to proxy target and fills up c's fields using the response
+// forwads request to proxy target and fills up cache entry's fields using the response
 func (c *Cache) newRequest(r *http.Request) *http.Response {
 	res, err := helper.DoRequest(r)
 	if err != nil {
@@ -115,7 +115,7 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 	}
 
 	// first request or retry
-	c = &Cache{ready: make(chan bool), key: key}
+	c = &Cache{ready: make(chan bool), keys: []string{key}}
 	cachePool.pool[key] = c
 	cachePool.mtx.Unlock()
 
@@ -138,22 +138,25 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 }
 
 func accept(c *Cache) {
-	protectList.protect(c)
-
 	cachePool.mtx.Lock()
-	defer cachePool.mtx.Unlock()
 
 	cachePool.size += len(c.Content)
 
 	if !helper.Config.CacheUnique {
+		cachePool.mtx.Unlock()
+		protectList.protect(c)
 		return
 	}
 
 	// ensure same response data being added only once to the pool
 	if cc, ok := cachePool.hashes[c.hash]; ok {
-		cachePool.pool[c.key] = cc
+		cachePool.pool[c.keys[0]] = cc
+		cc.keys = append(cc.keys, c.keys[0])
+		cachePool.mtx.Unlock()
 	} else {
 		cachePool.hashes[c.hash] = c
+		cachePool.mtx.Unlock()
+		protectList.protect(c)
 	}
 }
 
