@@ -25,13 +25,21 @@ func main() {
 
 func proxy(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
-		// TODO:
+		switch helper.Config.NonGetMode {
+		case helper.ModePass:
+			helper.Forward(w, r)
+			return
+		case helper.ModeBlock:
+			return
+		case helper.ModeQueue:
+		case helper.ModeCache: // no-op
+		}
 	}
 
 	c, res := cache.Get(r)
 
 	if c == nil {
-		w.WriteHeader(http.StatusBadGateway)
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
@@ -47,6 +55,6 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 
 	_, err := w.Write(c.Content)
 	if err != nil {
-		helper.Log("", helper.LogErr)
+		helper.Log("", helper.LogInfo)
 	}
 }
