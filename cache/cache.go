@@ -62,17 +62,7 @@ func keygen(r *http.Request) string {
 
 // forwads request to proxy target and fills up c's fields using the response
 func (c *Cache) newRequest(r *http.Request) *http.Response {
-	fReq, err := http.NewRequest(r.Method, helper.Config.TargetAddr+r.RequestURI, nil)
-	if err != nil {
-		helper.Log("", helper.LogErr)
-		return nil
-	}
-
-	for h := range r.Header {
-		fReq.Header.Add(h, r.Header.Get(h))
-	}
-
-	res, err := http.DefaultClient.Do(fReq)
+	res, err := helper.DoRequest(r)
 	if err != nil {
 		helper.Log("", helper.LogErr)
 		return nil
