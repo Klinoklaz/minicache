@@ -78,6 +78,7 @@ func Queue(w http.ResponseWriter, r *http.Request) {
 
 	if Config.QueueCap > 0 && queueing.cnt > Config.QueueCap {
 		queueing.mtx.RUnlock()
+		w.WriteHeader(http.StatusTooManyRequests)
 		return
 	}
 
