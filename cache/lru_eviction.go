@@ -52,6 +52,8 @@ func (p *protecting) unprotect() {
 		cc := p.li.Remove(c).(*Cache)
 		cc.status = stale
 		lruList.li = append(lruList.li, cc)
+
+		helper.Log(helper.LogDebug, "moving protected cache entry to LRU list. %s", cc)
 	}
 
 	p.mtx.Unlock()
@@ -89,6 +91,8 @@ func lruEvict() {
 			}
 			cachePool.size -= len(c.Content)
 			lruList.li = lruList.li[:len(lruList.li)-1]
+
+			helper.Log(helper.LogDebug, "evicting cache entry. %s", c)
 		}
 
 		cachePool.mtx.Unlock()
