@@ -11,6 +11,7 @@ import (
 func main() {
 	var confFile string
 	flag.StringVar(&confFile, "f", "", "Specify a config file")
+	flag.Parse()
 	if confFile != "" {
 		helper.LoadConfFile(confFile)
 	}
