@@ -21,7 +21,7 @@ var (
 		using bool
 	}
 
-	logger *log.Logger = log.New(os.Stderr, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lmsgprefix)
+	logger *log.Logger = log.New(os.Stderr, "", log.Ldate|log.Ltime|log.Lmicroseconds)
 )
 
 func Log(level int, format string, a ...any) {
@@ -29,19 +29,20 @@ func Log(level int, format string, a ...any) {
 		return
 	}
 
+	// NOTE: use logger.SetPrefix then call logger.Printf is not concurrency-safe
 	switch level {
 	case LogDebug:
-		logger.SetPrefix("[DEBUG]")
+		format = "[DEBUG]" + format
 	case LogInfo:
-		logger.SetPrefix("[INFO]")
+		format = "[INFO]" + format
 	case LogWarn:
-		logger.SetPrefix("[WARNING]")
+		format = "[WARNING]" + format
 	case LogErr:
-		logger.SetPrefix("[ERROR]")
+		format = "[ERROR]" + format
 	case LogFatal:
-		logger.SetPrefix("[FATAL]")
+		format = "[FATAL]" + format
 	default:
-		logger.SetPrefix("[UNKNOWN]")
+		format = "[UNKNOWN]" + format
 	}
 
 	logger.Printf(format, a...)
