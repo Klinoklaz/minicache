@@ -3,6 +3,8 @@ package cache
 import (
 	"container/list"
 	"crypto/md5"
+	"encoding/hex"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -22,6 +24,16 @@ type Cache struct {
 	hash        [16]byte
 	status      byte
 	protectedAt time.Time
+}
+
+func (c *Cache) String() string {
+	return fmt.Sprintf("URIs: %v, access count: %d, status: %c, content length: %d, hash: %s, protected at: %s",
+		c.keys,
+		c.accessCnt,
+		c.status,
+		len(c.Content),
+		hex.EncodeToString(c.hash[:]),
+		c.protectedAt.Format(time.StampMicro))
 }
 
 // cache entry status
@@ -55,9 +67,9 @@ func Init() {
 
 func keygen(r *http.Request) string {
 	if helper.Config.CacheMobile && strings.Contains(r.Header.Get("User-Agent"), "Mobi") {
-		return "_" + r.RequestURI
+		return "_" + r.Method[0:2] + "_" + r.RequestURI
 	}
-	return r.RequestURI
+	return r.Method[0:2] + "_" + r.RequestURI
 }
 
 // forwads request to proxy target and fills up cache entry's fields using the response
@@ -67,7 +79,7 @@ func (c *Cache) newRequest(r *http.Request) *http.Response {
 
 	res, err := helper.DoRequest(r)
 	if err != nil {
-		helper.Log("", helper.LogErr)
+		helper.Log(helper.LogErr, "caching target unreachable, %s %s #%s", r.Method, r.RequestURI, err)
 		return nil
 	}
 	defer res.Body.Close()
@@ -85,7 +97,7 @@ func (c *Cache) newRequest(r *http.Request) *http.Response {
 
 	c.Content, err = io.ReadAll(res.Body)
 	if err != nil {
-		helper.Log("", helper.LogErr) // this kind of error handling looks like C style, probably shouldn't do that
+		helper.Log(helper.LogErr, "could not read response for caching, %s %s #%s", r.Method, r.RequestURI, err)
 	} else if helper.Config.CacheUnique {
 		c.hash = md5.Sum(c.Content)
 	}
@@ -134,7 +146,7 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 		cachePool.mtx.Lock()
 		delete(cachePool.pool, key)
 		cachePool.mtx.Unlock()
-		helper.Log("New cache can not be added because cache pool is already full.", helper.LogInfo)
+		helper.Log(helper.LogInfo, "new cache can not be added because cache pool is already full.")
 	}
 
 	return c, res
@@ -156,10 +168,12 @@ func accept(c *Cache) {
 		cachePool.pool[c.keys[0]] = cc
 		cc.keys = append(cc.keys, c.keys[0])
 		cachePool.mtx.Unlock()
+		helper.Log(helper.LogDebug, "found duplicated content for %s, merge into existing one. %s", c.keys[0], cc)
 	} else {
 		cachePool.hashes[c.hash] = c
 		cachePool.mtx.Unlock()
 		protectList.protect(c)
+		helper.Log(helper.LogDebug, "new cache entry added. %s", c)
 	}
 }
 

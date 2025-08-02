@@ -2,7 +2,6 @@ package helper
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"time"
 )
@@ -18,7 +17,7 @@ type config struct {
 	LocalAddr        string        `json:"local_addr"`  // Local listening address
 	TargetAddr       string        `json:"target_addr"` // Proxy target
 	LogFile          string        `json:"log_file"`    // Specify a log destination
-	LogLevel         byte          // Specify a log level: debug|info|warning|error
+	LogLevel         int           // Specify a log level: debug|info|warning|error
 	CacheUnique      bool          `json:"cache_unique"` // Deduplicate if different URLs return same response?
 	CacheMobile      bool          `json:"cache_mobile"` // Detect mobile UA and cache the responses separately?
 	CacheSize        int           `json:"cache_size"`   // Max cache size in bytes, default 1 GB
@@ -42,7 +41,7 @@ var Config config = config{
 func LoadConfFile(file string) {
 	data, err := os.ReadFile(file)
 	if err != nil {
-		Log("", LogWarn)
+		Log(LogWarn, "can't read config file %s, default config values will be used. #%s", file, err)
 		return
 	}
 
@@ -56,7 +55,7 @@ func LoadConfFile(file string) {
 
 	err = json.Unmarshal(data, &jsonData)
 	if err != nil {
-		Log("", LogWarn)
+		Log(LogWarn, "invalid config file %s, default config values will be used. #%s", file, err)
 		return
 	}
 
@@ -69,6 +68,10 @@ func LoadConfFile(file string) {
 		Config.LogLevel = LogWarn
 	case "error":
 		Config.LogLevel = LogErr
+	}
+
+	if Config.LogFile != "" {
+		setLogFile(Config.LogFile)
 	}
 
 	switch jsonData.NG {
@@ -91,5 +94,5 @@ func LoadConfFile(file string) {
 		Config.ProtectionExpire = time.Duration(jsonData.EX) * time.Minute
 	}
 
-	Log(fmt.Sprintf("Loaded config JSON: %v, current ConfGlobal: %v", jsonData, Config), LogInfo)
+	Log(LogInfo, "Loaded config JSON: %+v, current config values: %+v", jsonData, Config)
 }

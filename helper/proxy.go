@@ -30,7 +30,7 @@ func Forward(w http.ResponseWriter, r *http.Request) {
 	res, err := DoRequest(r)
 	if err != nil {
 		w.WriteHeader(http.StatusBadGateway)
-		Log(fmt.Sprintf("target not reachable, %s %s", r.Method, r.RequestURI), LogErr)
+		Log(LogErr, "target not reachable, %s %s #%s", r.Method, r.RequestURI, err)
 		return
 	}
 	defer res.Body.Close()
@@ -42,7 +42,7 @@ func Forward(w http.ResponseWriter, r *http.Request) {
 	content, err := io.ReadAll(res.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		Log(fmt.Sprintf("could not read response from target, %s %s", r.Method, r.RequestURI), LogErr)
+		Log(LogErr, "could not read response from target, %s %s #%s", r.Method, r.RequestURI, err)
 		return
 	}
 
@@ -50,7 +50,7 @@ func Forward(w http.ResponseWriter, r *http.Request) {
 
 	_, err = w.Write(content)
 	if err != nil {
-		Log(fmt.Sprintf("client connection at %s is broken", r.RemoteAddr), LogInfo)
+		Log(LogInfo, "client connection at %s is broken. #%s", r.RemoteAddr, err)
 	}
 }
 
@@ -86,6 +86,7 @@ func Queue(w http.ResponseWriter, r *http.Request) {
 	queueing.mtx.Lock()
 	queueing.cnt++
 	queueing.mtx.Unlock()
+	Log(LogDebug, "queueing request %s %s", r.Method, r.RequestURI)
 
 	// wait
 	<-proxyQueue
@@ -94,6 +95,7 @@ func Queue(w http.ResponseWriter, r *http.Request) {
 	queueing.mtx.Lock()
 	queueing.cnt--
 	queueing.mtx.Unlock()
+	Log(LogDebug, "dequeue request %s %s", r.Method, r.RequestURI)
 
 	Forward(w, r)
 }

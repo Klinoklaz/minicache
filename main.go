@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"log"
 	"net/http"
 
 	"github.com/Klinoklaz/minicache/cache"
@@ -20,7 +19,8 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", proxy)
-	log.Fatalln(http.ListenAndServe(helper.Config.LocalAddr, mux))
+	err := http.ListenAndServe(helper.Config.LocalAddr, mux)
+	helper.Log(helper.LogFatal, "can't start proxy server at %s #%s", helper.Config.LocalAddr, err)
 }
 
 func proxy(w http.ResponseWriter, r *http.Request) {
@@ -57,6 +57,6 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 
 	_, err := w.Write(c.Content)
 	if err != nil {
-		helper.Log("", helper.LogInfo)
+		helper.Log(helper.LogInfo, "could not send cache, client connection at %s is broken. #%s", r.RemoteAddr, err)
 	}
 }
