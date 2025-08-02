@@ -32,6 +32,8 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 		case helper.ModeBlock:
 			return
 		case helper.ModeQueue:
+			helper.Queue(w, r)
+			return
 		case helper.ModeCache: // no-op
 		}
 	}

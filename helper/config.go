@@ -23,9 +23,8 @@ type config struct {
 	CacheMobile      bool          `json:"cache_mobile"` // Detect mobile UA and cache the responses separately?
 	CacheSize        int           `json:"cache_size"`   // Max cache size in bytes, default 1 GB
 	NonGetMode       byte          // How to deal with non-GET requests: pass|block|cache|queue
-	QueueLength      int           `json:"queue_length"` // Queue at most this number of requests for `non_get_mode=queue`. Otherwise has no effect
-	QueueSize        int           `json:"queue_size"`   // Max queue size in bytes for `non_get_mode=queue`, default 1 MB. Otherwise has no effect
-	DequeueRate      float32       `json:"dequeue_rate"` // Dequeue and forward this number of queued requests per second when `non_get_mode=queue`
+	QueueCap         int           `json:"queue_capacity"` // Queue at most this number of requests for `non_get_mode=queue`. Otherwise has no effect
+	DequeueRate      float32       `json:"dequeue_rate"`   // Dequeue and forward this number of queued requests per second when `non_get_mode=queue`
 	LruTime          time.Duration // track access count within this time period (minutes) for each cache entry
 	ProtectionExpire time.Duration // Fresh requests will go stale and fall into LRU list after this much of time (minutes)
 	// TODO: support cache TTL, manual cache deleting
@@ -36,7 +35,6 @@ var Config config = config{
 	LogLevel:         LogWarn,
 	CacheSize:        1 << 30,
 	NonGetMode:       ModePass,
-	QueueSize:        1 << 20,
 	LruTime:          time.Duration(30) * time.Minute,
 	ProtectionExpire: time.Duration(30) * time.Minute,
 }
@@ -82,6 +80,8 @@ func LoadConfFile(file string) {
 		Config.NonGetMode = ModeCache
 	case "queue":
 		Config.NonGetMode = ModeQueue
+		proxyQueue = make(chan bool)
+		go dequeue()
 	}
 
 	if jsonData.LT > 0 {
