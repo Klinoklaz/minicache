@@ -62,6 +62,9 @@ func keygen(r *http.Request) string {
 
 // forwads request to proxy target and fills up cache entry's fields using the response
 func (c *Cache) newRequest(r *http.Request) *http.Response {
+	r.Header.Del("Authorization")
+	r.Header.Del("Cookie")
+
 	res, err := helper.DoRequest(r)
 	if err != nil {
 		helper.Log("", helper.LogErr)
