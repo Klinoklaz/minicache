@@ -94,5 +94,5 @@ func LoadConfFile(file string) {
 		Config.ProtectionExpire = time.Duration(jsonData.EX) * time.Minute
 	}
 
-	Log(LogInfo, "Loaded config JSON: %+v, current config values: %+v", jsonData, Config)
+	Log(LogInfo, "config file loaded, current conf values: %+v", Config)
 }

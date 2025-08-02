@@ -20,8 +20,10 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", proxy)
+
+	helper.Log(helper.LogInfo, "starting server at %s, targeting %s", helper.Config.LocalAddr, helper.Config.TargetAddr)
 	err := http.ListenAndServe(helper.Config.LocalAddr, mux)
-	helper.Log(helper.LogFatal, "can't start proxy server at %s #%s", helper.Config.LocalAddr, err)
+	helper.Log(helper.LogFatal, "failed starting proxy server. #%s", err)
 }
 
 func proxy(w http.ResponseWriter, r *http.Request) {
