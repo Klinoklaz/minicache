@@ -135,19 +135,21 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 	cachePool.mtx.Unlock()
 
 	res := c.newRequest(r)
-	close(c.ready)
 
 	if c.status != invalid && cachePool.size < helper.Config.CacheSize {
 		accept(c)
 	} else {
-		go func() { cachePool.evictorWakeup <- true }()
-		// if we allow new cache to be accepted here,
-		// protected list may grow infinitely before anything being moved to LRU list
 		cachePool.mtx.Lock()
 		delete(cachePool.pool, key)
 		cachePool.mtx.Unlock()
-		helper.Log(helper.LogInfo, "new cache can not be added because cache pool is already full.")
+		// if we allow new cache to be accepted here,
+		// protected list may grow infinitely before anything being moved to LRU list
+		if c.status != invalid {
+			go func() { cachePool.evictorWakeup <- true }()
+			helper.Log(helper.LogInfo, "new cache can not be added because cache pool is already full.")
+		}
 	}
+	close(c.ready)
 
 	return c, res
 }

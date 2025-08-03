@@ -32,13 +32,13 @@ func (p *protecting) protect(c *Cache) {
 
 var (
 	// protected list, fresh cache entries go here.
-	protectList protecting
+	protectList protecting = protecting{li: list.New()}
 
 	lruList evicting
 
 	// stale cache entry goes from LRU list to here
 	// if it wasn't evicted after some configured time
-	reprotectList protecting
+	reprotectList protecting = protecting{li: list.New()}
 )
 
 // move stale cache from protection to LRU list.
