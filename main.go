@@ -16,6 +16,7 @@ func main() {
 		helper.LoadConfFile(confFile)
 	}
 
+	helper.LogSignal()
 	cache.Init()
 
 	mux := http.NewServeMux()
@@ -33,6 +34,7 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 			helper.Forward(w, r)
 			return
 		case helper.ModeBlock:
+			w.WriteHeader(http.StatusForbidden)
 			return
 		case helper.ModeQueue:
 			helper.Queue(w, r)

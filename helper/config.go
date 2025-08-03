@@ -6,11 +6,12 @@ import (
 	"time"
 )
 
+// Config.NonGetMode
 const (
-	ModePass  byte = 'P'
-	ModeBlock byte = 'B'
-	ModeCache byte = 'C'
-	ModeQueue byte = 'Q'
+	ModePass = iota
+	ModeBlock
+	ModeCache
+	ModeQueue
 )
 
 type config struct {
@@ -21,7 +22,7 @@ type config struct {
 	CacheUnique      bool          `json:"cache_unique"` // Deduplicate if different URLs return same response?
 	CacheMobile      bool          `json:"cache_mobile"` // Detect mobile UA and cache the responses separately?
 	CacheSize        int           `json:"cache_size"`   // Max cache size in bytes, default 1 GB
-	NonGetMode       byte          // How to deal with non-GET requests: pass|block|cache|queue
+	NonGetMode       int           // How to deal with non-GET requests: pass|block|cache|queue
 	QueueCap         int           `json:"queue_capacity"` // Queue at most this number of requests for `non_get_mode=queue`. Otherwise has no effect
 	DequeueRate      float32       `json:"dequeue_rate"`   // Dequeue and forward this number of queued requests per second when `non_get_mode=queue`
 	LruTime          time.Duration // track access count within this time period (minutes) for each cache entry
