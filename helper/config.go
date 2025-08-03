@@ -31,7 +31,7 @@ type config struct {
 }
 
 var Config config = config{
-	LocalAddr:        ":80",
+	LocalAddr:        ":3456",
 	LogLevel:         LogWarn,
 	CacheSize:        1 << 30,
 	NonGetMode:       ModePass,
