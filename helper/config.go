@@ -6,6 +6,21 @@ import (
 	"time"
 )
 
+// implements json.Unmarshaler
+type duration time.Duration
+
+func (d *duration) UnmarshalJSON(data []byte) error {
+	if len(data) < 3 {
+		return nil
+	}
+	dd, err := time.ParseDuration(string(data[1 : len(data)-1]))
+	if err != nil {
+		return err
+	}
+	*d = duration(dd)
+	return nil
+}
+
 // Config.NonGetMode
 const (
 	ModePass = iota
@@ -25,10 +40,11 @@ type config struct {
 	NonGetMode       int           // How to deal with non-GET requests: pass|block|cache|queue
 	QueueCap         int           `json:"queue_capacity"` // Queue at most this number of requests for `non_get_mode=queue`. Otherwise has no effect
 	DequeueRate      float32       `json:"dequeue_rate"`   // Dequeue and forward this number of queued requests per second when `non_get_mode=queue`
-	LruTime          time.Duration // track access count within this time period (minutes) for each cache entry
-	ProtectionExpire time.Duration // Fresh requests will go stale and fall into LRU list after this much of time (minutes)
+	LruTime          time.Duration // track access count within this time period for each cache entry
+	ProtectionExpire time.Duration // Fresh requests will go stale and fall into LRU list after this much of time
 
 	// Timeouts reserved for dealing with theoretical slow request DoS
+
 	IdleTimeout  time.Duration // Corresponds to http.Server.IdleTimeout
 	ReadTimeout  time.Duration // Corresponds to http.Server.ReadTimeout
 	WriteTimeout time.Duration // Corresponds to http.Server.WriteTimeout
@@ -53,13 +69,13 @@ func LoadConfFile(file string) {
 
 	jsonData := struct {
 		*config
-		LogLevel         string `json:"log_level"`
-		NonGetMode       string `json:"non_get_mode"`
-		LruTime          int    `json:"lru_time"`
-		ProtectionExpire int    `json:"protection_expire"`
-		IdleTimeout      int    `json:"idle_timeout"`
-		ReadTimeout      int    `json:"read_timeout"`
-		WriteTimeout     int    `json:"write_timeout"`
+		LogLevel         string   `json:"log_level"`
+		NonGetMode       string   `json:"non_get_mode"`
+		LruTime          duration `json:"lru_time"`
+		ProtectionExpire duration `json:"protection_expire"`
+		IdleTimeout      duration `json:"idle_timeout"`
+		ReadTimeout      duration `json:"read_timeout"`
+		WriteTimeout     duration `json:"write_timeout"`
 	}{config: &Config}
 
 	err = json.Unmarshal(data, &jsonData)
@@ -96,21 +112,11 @@ func LoadConfFile(file string) {
 		go dequeue()
 	}
 
-	if jsonData.LruTime > 0 {
-		Config.LruTime = time.Duration(jsonData.LruTime) * time.Minute
-	}
-	if jsonData.IdleTimeout > 0 {
-		Config.IdleTimeout = time.Duration(jsonData.IdleTimeout) * time.Minute
-	}
-	if jsonData.ReadTimeout > 0 {
-		Config.ReadTimeout = time.Duration(jsonData.ReadTimeout) * time.Minute
-	}
-	if jsonData.WriteTimeout > 0 {
-		Config.WriteTimeout = time.Duration(jsonData.WriteTimeout) * time.Minute
-	}
-	if jsonData.ProtectionExpire > 0 {
-		Config.ProtectionExpire = time.Duration(jsonData.ProtectionExpire) * time.Minute
-	}
+	Config.LruTime = time.Duration(jsonData.LruTime)
+	Config.IdleTimeout = time.Duration(jsonData.IdleTimeout)
+	Config.ReadTimeout = time.Duration(jsonData.ReadTimeout)
+	Config.WriteTimeout = time.Duration(jsonData.WriteTimeout)
+	Config.ProtectionExpire = time.Duration(jsonData.ProtectionExpire)
 
 	Log(LogInfo, "config file loaded, current conf values: %+v", Config)
 }
