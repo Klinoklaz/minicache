@@ -27,6 +27,11 @@ type config struct {
 	DequeueRate      float32       `json:"dequeue_rate"`   // Dequeue and forward this number of queued requests per second when `non_get_mode=queue`
 	LruTime          time.Duration // track access count within this time period (minutes) for each cache entry
 	ProtectionExpire time.Duration // Fresh requests will go stale and fall into LRU list after this much of time (minutes)
+
+	// Timeouts reserved for dealing with theoretical slow request DoS
+	IdleTimeout  time.Duration // Corresponds to http.Server.IdleTimeout
+	ReadTimeout  time.Duration // Corresponds to http.Server.ReadTimeout
+	WriteTimeout time.Duration // Corresponds to http.Server.WriteTimeout
 	// TODO: support cache TTL, manual cache deleting
 }
 
@@ -35,8 +40,8 @@ var Config config = config{
 	LogLevel:         LogWarn,
 	CacheSize:        1 << 30,
 	NonGetMode:       ModePass,
-	LruTime:          time.Duration(30) * time.Minute,
-	ProtectionExpire: time.Duration(30) * time.Minute,
+	LruTime:          30 * time.Minute,
+	ProtectionExpire: 30 * time.Minute,
 }
 
 func LoadConfFile(file string) {
@@ -48,10 +53,13 @@ func LoadConfFile(file string) {
 
 	jsonData := struct {
 		*config
-		LL string `json:"log_level"`
-		NG string `json:"non_get_mode"`
-		LT int    `json:"lru_time"`
-		EX int    `json:"protection_expire"`
+		LogLevel         string `json:"log_level"`
+		NonGetMode       string `json:"non_get_mode"`
+		LruTime          int    `json:"lru_time"`
+		ProtectionExpire int    `json:"protection_expire"`
+		IdleTimeout      int    `json:"idle_timeout"`
+		ReadTimeout      int    `json:"read_timeout"`
+		WriteTimeout     int    `json:"write_timeout"`
 	}{config: &Config}
 
 	err = json.Unmarshal(data, &jsonData)
@@ -60,7 +68,7 @@ func LoadConfFile(file string) {
 		return
 	}
 
-	switch jsonData.LL {
+	switch jsonData.LogLevel {
 	case "debug":
 		Config.LogLevel = LogDebug
 	case "info":
@@ -75,7 +83,7 @@ func LoadConfFile(file string) {
 		setLogFile(Config.LogFile)
 	}
 
-	switch jsonData.NG {
+	switch jsonData.NonGetMode {
 	case "pass":
 		Config.NonGetMode = ModePass
 	case "block":
@@ -88,11 +96,20 @@ func LoadConfFile(file string) {
 		go dequeue()
 	}
 
-	if jsonData.LT > 0 {
-		Config.LruTime = time.Duration(jsonData.LT) * time.Minute
+	if jsonData.LruTime > 0 {
+		Config.LruTime = time.Duration(jsonData.LruTime) * time.Minute
 	}
-	if jsonData.EX > 0 {
-		Config.ProtectionExpire = time.Duration(jsonData.EX) * time.Minute
+	if jsonData.IdleTimeout > 0 {
+		Config.IdleTimeout = time.Duration(jsonData.IdleTimeout) * time.Minute
+	}
+	if jsonData.ReadTimeout > 0 {
+		Config.ReadTimeout = time.Duration(jsonData.ReadTimeout) * time.Minute
+	}
+	if jsonData.WriteTimeout > 0 {
+		Config.WriteTimeout = time.Duration(jsonData.WriteTimeout) * time.Minute
+	}
+	if jsonData.ProtectionExpire > 0 {
+		Config.ProtectionExpire = time.Duration(jsonData.ProtectionExpire) * time.Minute
 	}
 
 	Log(LogInfo, "config file loaded, current conf values: %+v", Config)

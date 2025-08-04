@@ -9,7 +9,7 @@ import (
 )
 
 func DoRequest(r *http.Request) (*http.Response, error) {
-	fReq, err := http.NewRequest(r.Method, Config.TargetAddr+r.RequestURI, nil)
+	fReq, err := http.NewRequest(r.Method, Config.TargetAddr+r.RequestURI, r.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating request for target: %w", err)
 	}

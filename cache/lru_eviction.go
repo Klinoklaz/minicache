@@ -62,7 +62,7 @@ func (p *protecting) unprotect() {
 
 func cacheStale() {
 	for {
-		time.Sleep(time.Duration(30) * time.Second) // could be configurable, but seems trivial
+		time.Sleep(30 * time.Second) // could be configurable, but seems trivial
 		protectList.unprotect()
 		reprotectList.unprotect()
 	}

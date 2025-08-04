@@ -19,11 +19,16 @@ func main() {
 	helper.LogSignal()
 	cache.Init()
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", proxy)
+	server := &http.Server{
+		Addr:         helper.Config.LocalAddr,
+		Handler:      http.HandlerFunc(proxy),
+		IdleTimeout:  helper.Config.IdleTimeout,
+		ReadTimeout:  helper.Config.ReadTimeout,
+		WriteTimeout: helper.Config.WriteTimeout,
+	}
 
 	helper.Log(helper.LogInfo, "starting server at %s, targeting %s", helper.Config.LocalAddr, helper.Config.TargetAddr)
-	err := http.ListenAndServe(helper.Config.LocalAddr, mux)
+	err := server.ListenAndServe()
 	helper.Log(helper.LogFatal, "failed starting proxy server. #%s", err)
 }
 
