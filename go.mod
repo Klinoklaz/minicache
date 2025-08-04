@@ -1,4 +1,4 @@
-module github.com/Klinoklaz/minicache
+module github.com/klinoklaz/minicache
 
 go 1.23.0
 

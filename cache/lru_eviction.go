@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Klinoklaz/minicache/helper"
+	"github.com/klinoklaz/minicache/helper"
 )
 
 type protecting struct {

@@ -4,8 +4,8 @@ import (
 	"flag"
 	"net/http"
 
-	"github.com/Klinoklaz/minicache/cache"
-	"github.com/Klinoklaz/minicache/helper"
+	"github.com/klinoklaz/minicache/cache"
+	"github.com/klinoklaz/minicache/helper"
 )
 
 func main() {

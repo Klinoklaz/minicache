@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Klinoklaz/minicache/helper"
+	"github.com/klinoklaz/minicache/helper"
 )
 
 type Cache struct {
