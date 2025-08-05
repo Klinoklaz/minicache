@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+var client *http.Client = &http.Client{Timeout: 15 * time.Second}
+
 func DoRequest(r *http.Request) (*http.Response, error) {
 	fReq, err := http.NewRequest(r.Method, Config.TargetAddr+r.RequestURI, r.Body)
 	if err != nil {
@@ -18,7 +20,7 @@ func DoRequest(r *http.Request) (*http.Response, error) {
 		fReq.Header.Add(h, r.Header.Get(h))
 	}
 
-	res, err := http.DefaultClient.Do(fReq)
+	res, err := client.Do(fReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed sending request to target: %w", err)
 	}

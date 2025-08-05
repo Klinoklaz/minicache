@@ -2,6 +2,7 @@ package cache
 
 import (
 	"container/list"
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
@@ -107,13 +108,14 @@ func (c *Cache) newRequest(r *http.Request) *http.Response {
 
 // get cache entry
 func Get(r *http.Request) (*Cache, *http.Response) {
+	ctx := r.Context()
 	key := keygen(r)
 
 	cachePool.mtx.RLock()
 	c := cachePool.pool[key]
 
 	if c != nil && c.status != invalid {
-		countAccess(c)
+		countAccess(c, ctx)
 		cachePool.mtx.RUnlock()
 		return c, nil
 	}
@@ -124,7 +126,7 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 	// check again since there's a time window in lock escalation
 	c = cachePool.pool[key]
 	if c != nil && c.status != invalid {
-		countAccess(c)
+		countAccess(c, ctx)
 		cachePool.mtx.Unlock()
 		return c, nil
 	}
@@ -179,8 +181,17 @@ func accept(c *Cache) {
 	}
 }
 
-func countAccess(c *Cache) {
-	<-c.ready
+func countAccess(c *Cache, ctx context.Context) {
+	// the goroutine responsible for closing c.ready can be effected
+	// by some timeout settings and terminates before actually closing it,
+	// this select statement is necessary to prevent severe goroutine leak.
+	// before fix, the bug is 100% reproducible
+	// when stress testing a cold-boot instance
+	select {
+	case <-c.ready:
+	case <-ctx.Done():
+		return
+	}
 
 	// access count doesn't need to be accurate, so no locking on individual entry
 	if time.Since(c.protectedAt) <= helper.Config.LfuTime {
