@@ -38,9 +38,11 @@ type config struct {
 	CacheMobile      bool          `json:"cache_mobile"` // Detect mobile UA and cache the responses separately?
 	CacheSize        int           `json:"cache_size"`   // Max cache size in bytes, default 1 GB
 	NonGetMode       int           // How to deal with non-GET requests: pass|block|cache|queue
-	QueueCap         int           `json:"queue_capacity"` // Queue at most this number of requests for `non_get_mode=queue`. Otherwise has no effect
-	DequeueRate      float32       `json:"dequeue_rate"`   // Dequeue and forward this number of queued requests per second when `non_get_mode=queue`
-	LfuTime          time.Duration // track access count within this time period for each cache entry
+	QueueCap         int           `json:"queue_capacity"`   // Queue at most this number of requests for `non_get_mode=queue`. Otherwise has no effect
+	DequeueRate      float32       `json:"dequeue_rate"`     // Dequeue and forward this number of queued requests per second when `non_get_mode=queue`
+	RefreshPw        string        `json:"refresh_password"` // Password used in request header defined by RefreshHeader to force a cache update
+	RefreshHeader    string        `json:"refresh_header"`   // Request header name to carry your refresh password
+	LfuTime          time.Duration // Track access count within this time period for each cache entry
 	ProtectionExpire time.Duration // Fresh requests will go stale and fall into LFU list after this much of time
 
 	// Timeouts reserved for dealing with theoretical slow request DoS
@@ -48,7 +50,7 @@ type config struct {
 	IdleTimeout  time.Duration // Corresponds to http.Server.IdleTimeout
 	ReadTimeout  time.Duration // Corresponds to http.Server.ReadTimeout
 	WriteTimeout time.Duration // Corresponds to http.Server.WriteTimeout
-	// TODO: support cache TTL, manual cache deleting
+	// TODO: support cache TTL
 }
 
 var Config config = config{

@@ -13,5 +13,7 @@
     "protection_expire": "30m",
     "idle_timeout": "5s",
     "read_timeout": "2s",
-    "write_timeout": "2s"
+    "write_timeout": "2s",
+    "refresh_header": "X-Cache-Update",
+    "refresh_password": "true"
 }

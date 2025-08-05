@@ -33,6 +33,7 @@ func main() {
 }
 
 func proxy(w http.ResponseWriter, r *http.Request) {
+	// check if non-get requests need to be treated differently
 	if r.Method != "GET" {
 		switch helper.Config.NonGetMode {
 		case helper.ModePass:
@@ -48,8 +49,18 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	c, res := cache.Get(r)
-
+	var res *http.Response
+	var c *cache.Cache
+	// a password carried by custom header can be used to force update the cache
+	if helper.Config.RefreshHeader != "" &&
+		helper.Config.RefreshPw != "" &&
+		r.Header.Get(helper.Config.RefreshHeader) == helper.Config.RefreshPw {
+		c, res = cache.Refresh(r)
+	} else {
+		c, res = cache.Get(r)
+	}
+	// since the Get and Refresh function handles creation of new cache,
+	// nothing else needs to be done here
 	if c == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
