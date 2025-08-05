@@ -19,7 +19,7 @@ type evicting struct {
 	mtx sync.Mutex
 }
 
-// protect cache entry from LRU eviction.
+// protect cache entry from LFU eviction.
 // don't put this inside cache pool mutex's critical area
 func (p *protecting) protect(c *Cache) {
 	c.protectedAt = time.Now()
@@ -34,30 +34,30 @@ var (
 	// protected list, fresh cache entries go here.
 	protectList protecting = protecting{li: list.New()}
 
-	lruList evicting
+	lfuList evicting
 
-	// stale cache entry goes from LRU list to here
+	// stale cache entry goes from LFU list to here
 	// if it wasn't evicted after some configured time
 	reprotectList protecting = protecting{li: list.New()}
 )
 
-// move stale cache from protection to LRU list.
+// move stale cache from protection to LFU list.
 func (p *protecting) unprotect() {
 	p.mtx.Lock()
-	lruList.mtx.Lock()
+	lfuList.mtx.Lock()
 
 	for c := p.li.Front(); c != nil &&
 		time.Since(c.Value.(*Cache).protectedAt) > helper.Config.ProtectionExpire; c = p.li.Front() {
 
 		cc := p.li.Remove(c).(*Cache)
 		cc.status = stale
-		lruList.li = append(lruList.li, cc)
+		lfuList.li = append(lfuList.li, cc)
 
-		helper.Log(helper.LogDebug, "moving protected cache entry to LRU list. %s", cc)
+		helper.Log(helper.LogDebug, "moving protected cache entry to LFU list. %s", cc)
 	}
 
 	p.mtx.Unlock()
-	lruList.mtx.Unlock()
+	lfuList.mtx.Unlock()
 }
 
 func cacheStale() {
@@ -69,19 +69,19 @@ func cacheStale() {
 }
 
 // remove least recent used cache entry from pool
-func lruEvict() {
+func lfuEvict() {
 	for range cachePool.evictorWakeup {
 		cachePool.mtx.Lock()
-		lruList.mtx.Lock()
+		lfuList.mtx.Lock()
 
 		// sort in desc
-		slices.SortFunc(lruList.li, func(a, b *Cache) int {
+		slices.SortFunc(lfuList.li, func(a, b *Cache) int {
 			return b.accessCnt - a.accessCnt
 		})
 
 		// delete last
-		for cachePool.size > helper.Config.CacheSize && len(lruList.li) > 0 {
-			c := lruList.li[len(lruList.li)-1]
+		for cachePool.size > helper.Config.CacheSize && len(lfuList.li) > 0 {
+			c := lfuList.li[len(lfuList.li)-1]
 
 			for _, key := range c.keys {
 				delete(cachePool.pool, key)
@@ -90,12 +90,12 @@ func lruEvict() {
 				delete(cachePool.hashes, c.hash)
 			}
 			cachePool.size -= len(c.Content)
-			lruList.li = lruList.li[:len(lruList.li)-1]
+			lfuList.li = lfuList.li[:len(lfuList.li)-1]
 
 			helper.Log(helper.LogDebug, "evicting cache entry. %s", c)
 		}
 
 		cachePool.mtx.Unlock()
-		lruList.mtx.Unlock()
+		lfuList.mtx.Unlock()
 	}
 }

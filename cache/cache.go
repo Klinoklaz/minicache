@@ -61,7 +61,7 @@ func Init() {
 	}
 
 	protectList.li = list.New()
-	go lruEvict()
+	go lfuEvict()
 	go cacheStale()
 }
 
@@ -143,7 +143,7 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 		delete(cachePool.pool, key)
 		cachePool.mtx.Unlock()
 		// if we allow new cache to be accepted here,
-		// protected list may grow infinitely before anything being moved to LRU list
+		// protected list may grow infinitely before anything being moved to LFU list
 		if c.status != invalid {
 			go func() { cachePool.evictorWakeup <- true }()
 			helper.Log(helper.LogInfo, "new cache can not be added because cache pool is already full.")
@@ -183,7 +183,7 @@ func countAccess(c *Cache) {
 	<-c.ready
 
 	// access count doesn't need to be accurate, so no locking on individual entry
-	if time.Since(c.protectedAt) <= helper.Config.LruTime {
+	if time.Since(c.protectedAt) <= helper.Config.LfuTime {
 		c.accessCnt++
 		return
 	}
@@ -194,8 +194,8 @@ func countAccess(c *Cache) {
 		// but kinda ok
 		reprotectList.protect(c)
 
-		lruList.mtx.Lock()
-		lruList.li = lruList.li[:len(lruList.li)-1]
-		lruList.mtx.Unlock()
+		lfuList.mtx.Lock()
+		lfuList.li = lfuList.li[:len(lfuList.li)-1]
+		lfuList.mtx.Unlock()
 	}
 }

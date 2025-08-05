@@ -9,7 +9,7 @@
     "non_get_mode": "pass",
     "queue_capacity": 50,
     "dequeue_rate": 2,
-    "lru_time": "60m",
+    "lfu_time": "60m",
     "protection_expire": "30m",
     "idle_timeout": "5s",
     "read_timeout": "2s",

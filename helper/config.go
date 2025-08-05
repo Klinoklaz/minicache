@@ -40,8 +40,8 @@ type config struct {
 	NonGetMode       int           // How to deal with non-GET requests: pass|block|cache|queue
 	QueueCap         int           `json:"queue_capacity"` // Queue at most this number of requests for `non_get_mode=queue`. Otherwise has no effect
 	DequeueRate      float32       `json:"dequeue_rate"`   // Dequeue and forward this number of queued requests per second when `non_get_mode=queue`
-	LruTime          time.Duration // track access count within this time period for each cache entry
-	ProtectionExpire time.Duration // Fresh requests will go stale and fall into LRU list after this much of time
+	LfuTime          time.Duration // track access count within this time period for each cache entry
+	ProtectionExpire time.Duration // Fresh requests will go stale and fall into LFU list after this much of time
 
 	// Timeouts reserved for dealing with theoretical slow request DoS
 
@@ -56,7 +56,7 @@ var Config config = config{
 	LogLevel:         LogWarn,
 	CacheSize:        1 << 30,
 	NonGetMode:       ModePass,
-	LruTime:          30 * time.Minute,
+	LfuTime:          30 * time.Minute,
 	ProtectionExpire: 30 * time.Minute,
 }
 
@@ -71,7 +71,7 @@ func LoadConfFile(file string) {
 		*config
 		LogLevel         string   `json:"log_level"`
 		NonGetMode       string   `json:"non_get_mode"`
-		LruTime          duration `json:"lru_time"`
+		LfuTime          duration `json:"lfu_time"`
 		ProtectionExpire duration `json:"protection_expire"`
 		IdleTimeout      duration `json:"idle_timeout"`
 		ReadTimeout      duration `json:"read_timeout"`
@@ -112,7 +112,7 @@ func LoadConfFile(file string) {
 		go dequeue()
 	}
 
-	Config.LruTime = time.Duration(jsonData.LruTime)
+	Config.LfuTime = time.Duration(jsonData.LfuTime)
 	Config.IdleTimeout = time.Duration(jsonData.IdleTimeout)
 	Config.ReadTimeout = time.Duration(jsonData.ReadTimeout)
 	Config.WriteTimeout = time.Duration(jsonData.WriteTimeout)
