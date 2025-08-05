@@ -44,7 +44,7 @@ func Refresh(r *http.Request) (*Cache, *http.Response) {
 	}
 	cachePool.mtx.Unlock()
 	// only Header and Content fields of the original cache entry will be refreshed
-	// in order to avoid the trouble of updating its references (i.e. cache pool hashes)
+	// in order to avoid the trouble of updating its references (e.g., cache pool hashes)
 	c.Content = cc.Content
 	c.Header = cc.Header.Clone()
 
