@@ -115,8 +115,8 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 	c := cachePool.pool[key]
 
 	if c != nil && c.status != invalid {
-		countAccess(c, ctx)
 		cachePool.mtx.RUnlock()
+		countAccess(c, ctx)
 		return c, nil
 	}
 
@@ -126,8 +126,8 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 	// check again since there's a time window in lock escalation
 	c = cachePool.pool[key]
 	if c != nil && c.status != invalid {
-		countAccess(c, ctx)
 		cachePool.mtx.Unlock()
+		countAccess(c, ctx)
 		return c, nil
 	}
 
@@ -181,18 +181,17 @@ func accept(c *Cache) {
 	}
 }
 
+// don't put this inside cache pool's mutex section,
+// or it will create dead locks with accept()
 func countAccess(c *Cache, ctx context.Context) {
-	// the goroutine responsible for closing c.ready can be effected
-	// by some timeout settings and terminates before actually closing it,
-	// this select statement is necessary to prevent severe goroutine leak.
-	// before fix, the bug is 100% reproducible
-	// when stress testing a cold-boot instance
 	select {
 	case <-c.ready:
 	case <-ctx.Done():
 		return
 	}
 
+	// use protectedAt as starting point of the counting period makes sense
+	// because its first value is very close to the creation time of c.
 	// access count doesn't need to be accurate, so no locking on individual entry
 	if time.Since(c.protectedAt) <= helper.Config.LfuTime {
 		c.accessCnt++
@@ -200,13 +199,12 @@ func countAccess(c *Cache, ctx context.Context) {
 	}
 
 	c.accessCnt = 1
+	// NOTE: race, potentially can cause duplicated entries in the list,
+	// but kinda ok
 	if c.status != protect {
-		// NOTE: race, potentially can cause duplicated entries in the list,
-		// but kinda ok
 		reprotectList.protect(c)
-
-		lfuList.mtx.Lock()
-		lfuList.li = lfuList.li[:len(lfuList.li)-1]
-		lfuList.mtx.Unlock()
 	}
+	// there's no way to remove c from LFU list after reprotecting it
+	// since we don't know its index, this also leads to duplicated entries in LFU list.
+	// doesn't matter cuz LFU list will be sorted anyway
 }

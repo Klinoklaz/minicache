@@ -20,7 +20,7 @@ type evicting struct {
 }
 
 // protect cache entry from LFU eviction.
-// don't put this inside cache pool mutex's critical area
+// don't put this inside cache pool's mutex section
 func (p *protecting) protect(c *Cache) {
 	c.protectedAt = time.Now()
 	c.status = protect
