@@ -202,7 +202,8 @@ func countAccess(c *Cache, ctx context.Context) {
 	// NOTE: race, potentially can cause duplicated entries in the list,
 	// but kinda ok
 	if c.status != protect {
-		reprotectList.protect(c)
+		protectList.protect(c)
+		helper.Log(helper.LogDebug, "reprotect cache entry: %s", c)
 	}
 	// there's no way to remove c from LFU list after reprotecting it
 	// since we don't know its index, this also leads to duplicated entries in LFU list.

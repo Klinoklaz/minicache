@@ -32,13 +32,11 @@ func (p *protecting) protect(c *Cache) {
 
 var (
 	// protected list, fresh cache entries go here.
+	// stale cache entries go from LFU list to here as well,
+	// if it wasn't evicted after some configured time
 	protectList protecting = protecting{li: list.New()}
 
 	lfuList evicting
-
-	// stale cache entry goes from LFU list to here
-	// if it wasn't evicted after some configured time
-	reprotectList protecting = protecting{li: list.New()}
 )
 
 // move stale cache from protection to LFU list.
@@ -64,7 +62,6 @@ func cacheStale() {
 	for {
 		time.Sleep(30 * time.Second) // could be configurable, but seems trivial
 		protectList.unprotect()
-		reprotectList.unprotect()
 	}
 }
 
