@@ -67,19 +67,25 @@ func Init() {
 }
 
 func keygen(r *http.Request) string {
-	if helper.Config.CacheMobile && strings.Contains(r.Header.Get("User-Agent"), "Mobi") {
-		return "_" + r.Method[0:2] + "_" + r.RequestURI
+	prefix := ""
+	if helper.Config.NonGetMode == helper.ModeCache {
+		prefix += r.Method + "_"
 	}
-	return r.Method[0:2] + "_" + r.RequestURI
+	if helper.Config.CacheMobile && strings.Contains(r.Header.Get("User-Agent"), "Mobi") {
+		prefix = "_" + prefix
+	}
+	return prefix + r.RequestURI
 }
 
 // forwads request to proxy target and fills up cache entry's fields using the response
 func (c *Cache) newRequest(r *http.Request) *http.Response {
+	c.status = fresh
+
 	r.Header.Del("Authorization")
 	r.Header.Del("Cookie")
-
 	res, err := helper.DoRequest(r)
 	if err != nil {
+		c.status = invalid
 		helper.Log(helper.LogErr, "caching target unreachable, %s %s #%s", r.Method, r.RequestURI, err)
 		return nil
 	}
@@ -87,8 +93,6 @@ func (c *Cache) newRequest(r *http.Request) *http.Response {
 
 	if res.StatusCode != http.StatusOK {
 		c.status = invalid
-	} else {
-		c.status = fresh
 	}
 
 	c.accessCnt = 1
@@ -98,6 +102,7 @@ func (c *Cache) newRequest(r *http.Request) *http.Response {
 
 	c.Content, err = io.ReadAll(res.Body)
 	if err != nil {
+		c.status = invalid
 		helper.Log(helper.LogErr, "could not read response for caching, %s %s #%s", r.Method, r.RequestURI, err)
 	} else if helper.Config.CacheUnique {
 		c.hash = md5.Sum(c.Content)
@@ -138,18 +143,12 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 
 	res := c.newRequest(r)
 
-	if c.status != invalid && cachePool.size < helper.Config.CacheSize {
+	if c.status != invalid {
 		accept(c)
 	} else {
 		cachePool.mtx.Lock()
 		delete(cachePool.pool, key)
 		cachePool.mtx.Unlock()
-		// if we allow new cache to be accepted here,
-		// protected list may grow infinitely before anything being moved to LFU list
-		if c.status != invalid {
-			go func() { cachePool.evictorWakeup <- true }()
-			helper.Log(helper.LogInfo, "new cache can not be added because cache pool is already full.")
-		}
 	}
 	close(c.ready)
 
@@ -158,8 +157,12 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 
 func accept(c *Cache) {
 	cachePool.mtx.Lock()
+	helper.Log(helper.LogDebug, "adding new cache entry. %s", c)
 
-	cachePool.size += len(c.Content)
+	if cachePool.size += len(c.Content); cachePool.size > helper.Config.CacheSize {
+		helper.Log(helper.LogDebug, "cache pool size limit reached, currently %d, try to start evicting.", cachePool.size)
+		go func() { cachePool.evictorWakeup <- true }()
+	}
 
 	if !helper.Config.CacheUnique {
 		cachePool.mtx.Unlock()
@@ -167,17 +170,17 @@ func accept(c *Cache) {
 		return
 	}
 
-	// ensure same response data being added only once to the pool
+	// check hashes to ensure same response data being added only once to the pool
 	if cc, ok := cachePool.hashes[c.hash]; ok {
 		cachePool.pool[c.keys[0]] = cc
 		cc.keys = append(cc.keys, c.keys[0])
+		cachePool.size -= len(c.Content)
 		cachePool.mtx.Unlock()
 		helper.Log(helper.LogDebug, "found duplicated content for %s, merge into existing one. %s", c.keys[0], cc)
 	} else {
 		cachePool.hashes[c.hash] = c
 		cachePool.mtx.Unlock()
 		protectList.protect(c)
-		helper.Log(helper.LogDebug, "new cache entry added. %s", c)
 	}
 }
 
@@ -207,5 +210,5 @@ func countAccess(c *Cache, ctx context.Context) {
 	}
 	// there's no way to remove c from LFU list after reprotecting it
 	// since we don't know its index, this also leads to duplicated entries in LFU list.
-	// doesn't matter cuz LFU list will be sorted anyway
+	// the evictor function must take care of this situation
 }
