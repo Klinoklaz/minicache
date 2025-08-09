@@ -91,7 +91,7 @@ func LogSignal() {
 	go func() {
 		sig := <-sigs
 		// trigger a flush
-		Log(LogWarn, "received %s signal, terminating process.", sig)
+		Log(LogWarn, "received %s signal, exiting.", sig)
 		os.Exit(0)
 	}()
 
