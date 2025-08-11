@@ -1,12 +1,8 @@
 package helper
 
 import (
-	"bufio"
 	"log"
 	"os"
-	"os/signal"
-	"sync"
-	"syscall"
 )
 
 const (
@@ -17,18 +13,7 @@ const (
 	LogFatal
 )
 
-var (
-	logFile struct {
-		w     *bufio.Writer
-		f     *os.File // underlying file of the writer
-		mtx   sync.Mutex
-		inUse bool
-	}
-
-	sigs chan os.Signal = make(chan os.Signal, 1)
-
-	logger *log.Logger = log.New(os.Stderr, "", log.Ldate|log.Ltime|log.Lmicroseconds)
-)
+var logger *log.Logger = log.New(os.Stderr, "", log.Ldate|log.Ltime|log.Lmicroseconds)
 
 func Log(level int, format string, a ...any) {
 	if level < Config.LogLevel {
@@ -50,25 +35,11 @@ func Log(level int, format string, a ...any) {
 		format = "[UNKNOWN]" + format
 	}
 
-	logger.Printf(format, a...)
-
-	if level >= LogWarn && logFile.inUse {
-		logFile.mtx.Lock()
-		// kinda tricky to keep this concurrency-safe,
-		// is it really worth it to use bufio?
-		err := logFile.w.Flush()
-		if err != nil && logFile.inUse {
-			logger.SetOutput(os.Stderr)
-			logFile.inUse = false
-			logFile.f.Close()
-			logger.Printf("error writing log file, fall back to stderr. #%s", err)
-		}
-		logFile.mtx.Unlock()
-	}
-
 	if level >= LogFatal {
-		os.Exit(1) // log.Fatalf doesn't flush
+		logger.Fatalf(format, a...)
 	}
+
+	logger.Printf(format, a...)
 }
 
 // not concurrency-safe
@@ -79,21 +50,5 @@ func setLogFile(name string) {
 		return
 	}
 
-	logFile.f = f
-	logFile.w = bufio.NewWriter(f)
-	logger.SetOutput(logFile.w)
-
-	logFile.inUse = true
-}
-
-// handle SIGINT and SIGTERM
-func LogSignal() {
-	go func() {
-		sig := <-sigs
-		// trigger a flush
-		Log(LogWarn, "received %s signal, exiting.", sig)
-		os.Exit(0)
-	}()
-
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	logger.SetOutput(f)
 }

@@ -16,7 +16,6 @@ func main() {
 		helper.LoadConfFile(confFile)
 	}
 
-	helper.LogSignal()
 	cache.Init()
 
 	server := &http.Server{
