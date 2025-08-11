@@ -63,7 +63,6 @@ func Init() {
 
 	protectList.li = list.New()
 	go lfuEvict()
-	go cacheStale()
 }
 
 func keygen(r *http.Request) string {

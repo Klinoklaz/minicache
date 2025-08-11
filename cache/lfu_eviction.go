@@ -40,29 +40,12 @@ var (
 )
 
 // move cache entries from protection to LFU list by condition.
-func (p *protecting) unprotect(condition func(*list.Element) bool) {
-	for c := p.li.Front(); c != nil && condition(c); c = p.li.Front() {
-
+func (p *protecting) unprotect(condition func(*Cache) bool) {
+	for c := p.li.Front(); c != nil && condition(c.Value.(*Cache)); c = p.li.Front() {
 		cc := p.li.Remove(c).(*Cache)
 		cc.status = stale
 		lfuList.li = append(lfuList.li, cc)
-
 		helper.Log(helper.LogDebug, "moving protected cache entry to LFU list. %s", cc)
-	}
-}
-
-func cacheStale() {
-	for {
-		time.Sleep(30 * time.Second) // could be configurable, but seems trivial
-		protectList.mtx.Lock()
-		lfuList.mtx.Lock()
-
-		protectList.unprotect(func(e *list.Element) bool {
-			return time.Since(e.Value.(*Cache).protectedAt) > helper.Config.ProtectionExpire
-		})
-
-		protectList.mtx.Unlock()
-		lfuList.mtx.Unlock()
 	}
 }
 
@@ -77,10 +60,10 @@ func lfuEvict() {
 		// force a dequeue quota on protected list
 		// to guarantee at least this much of cache will be evicted
 		evictionQuota := cachePool.size - helper.Config.CacheSize
-		protectList.unprotect(func(e *list.Element) bool {
+		protectList.unprotect(func(c *Cache) bool {
 			forceStale := evictionQuota > 0
-			evictionQuota -= len(e.Value.(*Cache).Content)
-			return forceStale
+			evictionQuota -= len(c.Content)
+			return forceStale || time.Since(c.protectedAt) > helper.Config.ProtectionExpire
 		})
 
 		// sort in access count desc, content length asc
