@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/klinoklaz/minicache/cache"
-	"github.com/klinoklaz/minicache/helper"
+	"github.com/klinoklaz/minicache/util"
 )
 
 func main() {
@@ -13,47 +13,47 @@ func main() {
 	flag.StringVar(&confFile, "f", "", "Specify a config file")
 	flag.Parse()
 	if confFile != "" {
-		helper.LoadConfFile(confFile)
+		util.LoadConfFile(confFile)
 	}
 
 	cache.Init()
 
 	server := &http.Server{
-		Addr:         helper.Config.LocalAddr,
+		Addr:         util.Config.LocalAddr,
 		Handler:      http.HandlerFunc(proxy),
-		IdleTimeout:  helper.Config.IdleTimeout,
-		ReadTimeout:  helper.Config.ReadTimeout,
-		WriteTimeout: helper.Config.WriteTimeout,
+		IdleTimeout:  util.Config.IdleTimeout,
+		ReadTimeout:  util.Config.ReadTimeout,
+		WriteTimeout: util.Config.WriteTimeout,
 	}
 
-	helper.Log(helper.LogInfo, "starting server at %s, targeting %s", helper.Config.LocalAddr, helper.Config.TargetAddr)
+	util.Log(util.LogInfo, "starting server at %s, targeting %s", util.Config.LocalAddr, util.Config.TargetAddr)
 	err := server.ListenAndServe()
-	helper.Log(helper.LogFatal, "failed starting proxy server. #%s", err)
+	util.Log(util.LogFatal, "failed starting proxy server. #%s", err)
 }
 
 func proxy(w http.ResponseWriter, r *http.Request) {
 	// check if non-get requests need to be treated differently
 	if r.Method != "GET" {
-		switch helper.Config.NonGetMode {
-		case helper.ModePass:
-			helper.Forward(w, r)
+		switch util.Config.NonGetMode {
+		case util.ModePass:
+			util.Forward(w, r)
 			return
-		case helper.ModeBlock:
+		case util.ModeBlock:
 			w.WriteHeader(http.StatusForbidden)
 			return
-		case helper.ModeQueue:
-			helper.Queue(w, r)
+		case util.ModeQueue:
+			util.Queue(w, r)
 			return
-		case helper.ModeCache: // no-op
+		case util.ModeCache: // no-op
 		}
 	}
 
 	var res *http.Response
 	var c *cache.Cache
 	// a password carried by custom header can be used to force update the cache
-	if helper.Config.RefreshHeader != "" &&
-		helper.Config.RefreshPw != "" &&
-		r.Header.Get(helper.Config.RefreshHeader) == helper.Config.RefreshPw {
+	if util.Config.RefreshHeader != "" &&
+		util.Config.RefreshPw != "" &&
+		r.Header.Get(util.Config.RefreshHeader) == util.Config.RefreshPw {
 		c, res = cache.Refresh(r)
 	} else {
 		c, res = cache.Get(r)
@@ -77,6 +77,6 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 
 	_, err := w.Write(c.Content)
 	if err != nil {
-		helper.Log(helper.LogInfo, "could not send cache, client connection at %s is broken. #%s", r.RemoteAddr, err)
+		util.Log(util.LogInfo, "could not send cache, client connection at %s is broken. #%s", r.RemoteAddr, err)
 	}
 }

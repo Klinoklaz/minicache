@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/klinoklaz/minicache/helper"
+	"github.com/klinoklaz/minicache/util"
 )
 
 type Cache struct {
@@ -57,7 +57,7 @@ var cachePool struct {
 func Init() {
 	cachePool.evictorWakeup = make(chan bool)
 	cachePool.pool = make(map[string]*Cache)
-	if helper.Config.CacheUnique {
+	if util.Config.CacheUnique {
 		cachePool.hashes = make(map[[16]byte]*Cache)
 	}
 
@@ -67,10 +67,10 @@ func Init() {
 
 func keygen(r *http.Request) string {
 	prefix := ""
-	if helper.Config.NonGetMode == helper.ModeCache {
+	if util.Config.NonGetMode == util.ModeCache {
 		prefix += r.Method + "_"
 	}
-	if helper.Config.CacheMobile && strings.Contains(r.Header.Get("User-Agent"), "Mobi") {
+	if util.Config.CacheMobile && strings.Contains(r.Header.Get("User-Agent"), "Mobi") {
 		prefix = "_" + prefix
 	}
 	return prefix + r.RequestURI
@@ -82,10 +82,10 @@ func (c *Cache) newRequest(r *http.Request) *http.Response {
 
 	r.Header.Del("Authorization")
 	r.Header.Del("Cookie")
-	res, err := helper.DoRequest(r)
+	res, err := util.DoRequest(r)
 	if err != nil {
 		c.status = invalid
-		helper.Log(helper.LogErr, "caching target unreachable, %s %s #%s", r.Method, r.RequestURI, err)
+		util.Log(util.LogErr, "caching target unreachable, %s %s #%s", r.Method, r.RequestURI, err)
 		return nil
 	}
 	defer res.Body.Close()
@@ -102,8 +102,8 @@ func (c *Cache) newRequest(r *http.Request) *http.Response {
 	c.Content, err = io.ReadAll(res.Body)
 	if err != nil {
 		c.status = invalid
-		helper.Log(helper.LogErr, "could not read response for caching, %s %s #%s", r.Method, r.RequestURI, err)
-	} else if helper.Config.CacheUnique {
+		util.Log(util.LogErr, "could not read response for caching, %s %s #%s", r.Method, r.RequestURI, err)
+	} else if util.Config.CacheUnique {
 		c.hash = md5.Sum(c.Content)
 	}
 
@@ -156,14 +156,14 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 
 func accept(c *Cache) {
 	cachePool.mtx.Lock()
-	helper.Log(helper.LogDebug, "adding new cache entry. %s", c)
+	util.Log(util.LogDebug, "adding new cache entry. %s", c)
 
-	if cachePool.size += len(c.Content); cachePool.size > helper.Config.CacheSize {
-		helper.Log(helper.LogDebug, "cache pool size limit reached, currently %d, try to start evicting.", cachePool.size)
+	if cachePool.size += len(c.Content); cachePool.size > util.Config.CacheSize {
+		util.Log(util.LogDebug, "cache pool size limit reached, currently %d, try to start evicting.", cachePool.size)
 		go func() { cachePool.evictorWakeup <- true }()
 	}
 
-	if !helper.Config.CacheUnique {
+	if !util.Config.CacheUnique {
 		cachePool.mtx.Unlock()
 		protectList.protect(c)
 		return
@@ -175,7 +175,7 @@ func accept(c *Cache) {
 		cc.keys = append(cc.keys, c.keys[0])
 		cachePool.size -= len(c.Content)
 		cachePool.mtx.Unlock()
-		helper.Log(helper.LogDebug, "found duplicated content for %s, merge into existing one. %s", c.keys[0], cc)
+		util.Log(util.LogDebug, "found duplicated content for %s, merge into existing one. %s", c.keys[0], cc)
 	} else {
 		cachePool.hashes[c.hash] = c
 		cachePool.mtx.Unlock()
@@ -195,7 +195,7 @@ func countAccess(c *Cache, ctx context.Context) {
 	// use protectedAt as starting point of the counting period makes sense
 	// because its first value is very close to the creation time of c.
 	// access count doesn't need to be accurate, so no locking on individual entry
-	if time.Since(c.protectedAt) <= helper.Config.LfuTime {
+	if time.Since(c.protectedAt) <= util.Config.LfuTime {
 		c.accessCnt++
 		return
 	}
@@ -205,7 +205,7 @@ func countAccess(c *Cache, ctx context.Context) {
 	// but kinda ok
 	if c.status != protect {
 		protectList.protect(c)
-		helper.Log(helper.LogDebug, "reprotect cache entry: %s", c)
+		util.Log(util.LogDebug, "reprotect cache entry: %s", c)
 	}
 	// there's no way to remove c from LFU list after reprotecting it
 	// since we don't know its index, this also leads to duplicated entries in LFU list.

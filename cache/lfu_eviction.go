@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/klinoklaz/minicache/helper"
+	"github.com/klinoklaz/minicache/util"
 )
 
 type protecting struct {
@@ -45,7 +45,7 @@ func (p *protecting) unprotect(condition func(*Cache) bool) {
 		cc := p.li.Remove(c).(*Cache)
 		cc.status = stale
 		lfuList.li = append(lfuList.li, cc)
-		helper.Log(helper.LogDebug, "moving protected cache entry to LFU list. %s", cc)
+		util.Log(util.LogDebug, "moving protected cache entry to LFU list. %s", cc)
 	}
 }
 
@@ -59,11 +59,11 @@ func lfuEvict() {
 		// evction won't work if we don't have enough entries in LFU list.
 		// force a dequeue quota on protected list
 		// to guarantee at least this much of cache will be evicted
-		evictionQuota := cachePool.size - helper.Config.CacheSize
+		evictionQuota := cachePool.size - util.Config.CacheSize
 		protectList.unprotect(func(c *Cache) bool {
 			forceStale := evictionQuota > 0
 			evictionQuota -= len(c.Content)
-			return forceStale || time.Since(c.protectedAt) > helper.Config.ProtectionExpire
+			return forceStale || time.Since(c.protectedAt) > util.Config.ProtectionExpire
 		})
 
 		// sort in access count desc, content length asc
@@ -72,7 +72,7 @@ func lfuEvict() {
 		})
 
 		// delete last
-		for cachePool.size > helper.Config.CacheSize && len(lfuList.li) > 0 {
+		for cachePool.size > util.Config.CacheSize && len(lfuList.li) > 0 {
 			c := lfuList.li[len(lfuList.li)-1]
 			// check if c was reprotected
 			if c.status == protect {
@@ -82,13 +82,13 @@ func lfuEvict() {
 			for _, key := range c.keys {
 				delete(cachePool.pool, key)
 			}
-			if helper.Config.CacheUnique {
+			if util.Config.CacheUnique {
 				delete(cachePool.hashes, c.hash)
 			}
 			cachePool.size -= len(c.Content)
 			lfuList.li = lfuList.li[:len(lfuList.li)-1]
 
-			helper.Log(helper.LogDebug, "evicting cache entry. %s", c)
+			util.Log(util.LogDebug, "evicting cache entry. %s", c)
 		}
 
 		cachePool.mtx.Unlock()

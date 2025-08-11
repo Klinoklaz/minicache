@@ -3,7 +3,7 @@ package cache
 import (
 	"net/http"
 
-	"github.com/klinoklaz/minicache/helper"
+	"github.com/klinoklaz/minicache/util"
 )
 
 // cache refresh function for the use inside http handler
@@ -14,7 +14,7 @@ func Refresh(r *http.Request) (*Cache, *http.Response) {
 	// since the original cache entry is referenced everywhere,
 	// refreshing it directly would be a huge pain
 	cc := &Cache{ready: make(chan bool), keys: []string{key}}
-	helper.Log(helper.LogDebug, "refreshing cache entry: %s", key)
+	util.Log(util.LogDebug, "refreshing cache entry: %s", key)
 	res := cc.newRequest(r)
 	if cc.status == invalid {
 		close(cc.ready)
@@ -49,7 +49,7 @@ func Refresh(r *http.Request) (*Cache, *http.Response) {
 	c.Header = cc.Header.Clone()
 
 	close(c.ready)
-	helper.Log(helper.LogDebug, "cache entry updated: %s", c)
+	util.Log(util.LogDebug, "cache entry updated: %s", c)
 
 	return c, res
 }

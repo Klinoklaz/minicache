@@ -29,7 +29,7 @@ ExecStart=/path/to/minicache -f /path/to/config.json
 [Install]
 WantedBy=multi-user.target
 ```
-Refer to [config.go](./helper/config.go) for a full list of configurations and descriptions.
+Refer to [config.go](./util/config.go) for a full list of configurations and descriptions.
 
 ## Example with nginx
 Proxy config:

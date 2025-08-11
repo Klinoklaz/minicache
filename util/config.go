@@ -1,4 +1,4 @@
-package helper
+package util
 
 import (
 	"encoding/json"
@@ -50,7 +50,6 @@ type config struct {
 	IdleTimeout  time.Duration // Corresponds to http.Server.IdleTimeout
 	ReadTimeout  time.Duration // Corresponds to http.Server.ReadTimeout
 	WriteTimeout time.Duration // Corresponds to http.Server.WriteTimeout
-	// TODO: support cache TTL
 }
 
 var Config config = config{
