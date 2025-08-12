@@ -118,7 +118,9 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 	cachePool.mtx.RLock()
 	c := cachePool.pool[key]
 
-	if c != nil && c.status != invalid {
+	// can't && c.status != invalid here
+	// because it causes concurrent retry, which does no benefit
+	if c != nil {
 		cachePool.mtx.RUnlock()
 		countAccess(c, ctx)
 		return c, nil
@@ -129,7 +131,7 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 
 	// check again since there's a time window in lock escalation
 	c = cachePool.pool[key]
-	if c != nil && c.status != invalid {
+	if c != nil {
 		cachePool.mtx.Unlock()
 		countAccess(c, ctx)
 		return c, nil
@@ -189,6 +191,10 @@ func countAccess(c *Cache, ctx context.Context) {
 	select {
 	case <-c.ready:
 	case <-ctx.Done():
+		return
+	}
+
+	if c.status != invalid {
 		return
 	}
 
