@@ -158,7 +158,7 @@ func Get(r *http.Request) (*Cache, *http.Response) {
 
 func accept(c *Cache) {
 	cachePool.mtx.Lock()
-	util.Log(util.LogDebug, "adding new cache entry. %s", c)
+	util.Log(util.LogDebug, "adding new cache entry. %s (%d)", c.keys[0], len(c.Content))
 
 	if cachePool.size += len(c.Content); cachePool.size > util.Config.CacheSize {
 		util.Log(util.LogDebug, "cache pool size limit reached, currently %d, try to start evicting.", cachePool.size)
