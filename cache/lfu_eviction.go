@@ -51,6 +51,10 @@ func (p *protecting) unprotect(condition func(*Cache) bool) {
 
 // remove least frequently used cache entry from pool
 func lfuEvict() {
+	// shrink the pool size to 3/4 capacity in one go
+	// to prevent constant triggering of eviction
+	goal := util.Config.CacheSize * 3 / 4
+
 	for range cachePool.evictorWakeup {
 		cachePool.mtx.Lock()
 		protectList.mtx.Lock()
@@ -59,7 +63,7 @@ func lfuEvict() {
 		// evction won't work if we don't have enough entries in LFU list.
 		// force a dequeue quota on protected list
 		// to guarantee at least this much of cache will be evicted
-		evictionQuota := cachePool.size - util.Config.CacheSize
+		evictionQuota := cachePool.size - goal
 		protectList.unprotect(func(c *Cache) bool {
 			forceStale := evictionQuota > 0
 			evictionQuota -= len(c.Content)
@@ -71,8 +75,7 @@ func lfuEvict() {
 			return b.accessCnt - a.accessCnt + len(a.Content) - len(b.Content)
 		})
 
-		// delete last
-		for cachePool.size > util.Config.CacheSize && len(lfuList.li) > 0 {
+		for cachePool.size > goal && len(lfuList.li) > 0 {
 			c := lfuList.li[len(lfuList.li)-1]
 			// check if c was reprotected
 			if c.status == protect {
