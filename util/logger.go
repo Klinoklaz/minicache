@@ -1,6 +1,7 @@
 package util
 
 import (
+	"io"
 	"log"
 	"os"
 )
@@ -51,4 +52,12 @@ func setLogFile(name string) {
 	}
 
 	logger.SetOutput(f)
+}
+
+func GetLogWriter() io.Writer {
+	return logger.Writer()
+}
+
+func SetLogWriter(w io.Writer) {
+	logger.SetOutput(w)
 }

@@ -39,6 +39,7 @@ type config struct {
 	NonGetMode       int           // How to deal with non-GET requests: pass|block|cache
 	RefreshPw        string        `json:"refresh_password"` // Password used in request header defined by RefreshHeader to force a cache update
 	RefreshHeader    string        `json:"refresh_header"`   // Request header name to carry your refresh password
+	CliSocket        string        `json:"cli_socket"`       // Socket file for the cli tool
 	LfuTime          time.Duration // Track access count within this time period for each cache entry
 	ProtectionExpire time.Duration // Fresh requests will go stale and fall into LFU list after this much of time
 
@@ -58,7 +59,10 @@ var Config config = config{
 	ProtectionExpire: 30 * time.Minute,
 }
 
-func LoadConfFile(file string) {
+var LastConfFile string
+
+func LoadConfFile(file string, isCli bool) {
+	LastConfFile = file
 	data, err := os.ReadFile(file)
 	if err != nil {
 		Log(LogWarn, "can't read config file %s, default config values will be used. #%s", file, err)
@@ -93,7 +97,7 @@ func LoadConfFile(file string) {
 		Config.LogLevel = LogErr
 	}
 
-	if Config.LogFile != "" {
+	if Config.LogFile != "" && !isCli {
 		setLogFile(Config.LogFile)
 	}
 
