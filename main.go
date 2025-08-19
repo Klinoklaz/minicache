@@ -41,9 +41,6 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 		case util.ModeBlock:
 			w.WriteHeader(http.StatusForbidden)
 			return
-		case util.ModeQueue:
-			util.Queue(w, r)
-			return
 		case util.ModeCache: // no-op
 		}
 	}

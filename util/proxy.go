@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
 	"time"
 )
 
@@ -54,51 +53,4 @@ func Forward(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		Log(LogInfo, "client connection at %s is broken. #%s", r.RemoteAddr, err)
 	}
-}
-
-var (
-	proxyQueue chan bool
-
-	queueing struct {
-		cnt int // current number of requests in the queue
-		mtx sync.RWMutex
-	}
-)
-
-func dequeue() {
-	interval := 1000 / Config.DequeueRate
-	for {
-		time.Sleep(time.Duration(interval) * time.Millisecond)
-		proxyQueue <- true
-	}
-}
-
-// forwards requests one by one in a constant speed.
-// not particularly useful for rate limiting, but better than nothing
-func Queue(w http.ResponseWriter, r *http.Request) {
-	queueing.mtx.RLock()
-
-	if Config.QueueCap > 0 && queueing.cnt > Config.QueueCap {
-		queueing.mtx.RUnlock()
-		w.WriteHeader(http.StatusTooManyRequests)
-		return
-	}
-
-	// enqueue
-	queueing.mtx.RUnlock()
-	queueing.mtx.Lock()
-	queueing.cnt++
-	queueing.mtx.Unlock()
-	Log(LogDebug, "queueing request %s %s", r.Method, r.RequestURI)
-
-	// wait
-	<-proxyQueue
-
-	// dequeue
-	queueing.mtx.Lock()
-	queueing.cnt--
-	queueing.mtx.Unlock()
-	Log(LogDebug, "dequeue request %s %s", r.Method, r.RequestURI)
-
-	Forward(w, r)
 }

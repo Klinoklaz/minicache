@@ -26,7 +26,6 @@ const (
 	ModePass = iota
 	ModeBlock
 	ModeCache
-	ModeQueue
 )
 
 type config struct {
@@ -37,9 +36,7 @@ type config struct {
 	CacheUnique      bool          `json:"cache_unique"` // Deduplicate if different URLs return same response?
 	CacheMobile      bool          `json:"cache_mobile"` // Detect mobile UA and cache the responses separately?
 	CacheSize        int           `json:"cache_size"`   // Max cache size in bytes, default 1 GB
-	NonGetMode       int           // How to deal with non-GET requests: pass|block|cache|queue
-	QueueCap         int           `json:"queue_capacity"`   // Queue at most this number of requests for `non_get_mode=queue`. Otherwise has no effect
-	DequeueRate      float32       `json:"dequeue_rate"`     // Dequeue and forward this number of queued requests per second when `non_get_mode=queue`
+	NonGetMode       int           // How to deal with non-GET requests: pass|block|cache
 	RefreshPw        string        `json:"refresh_password"` // Password used in request header defined by RefreshHeader to force a cache update
 	RefreshHeader    string        `json:"refresh_header"`   // Request header name to carry your refresh password
 	LfuTime          time.Duration // Track access count within this time period for each cache entry
@@ -107,10 +104,6 @@ func LoadConfFile(file string) {
 		Config.NonGetMode = ModeBlock
 	case "cache":
 		Config.NonGetMode = ModeCache
-	case "queue":
-		Config.NonGetMode = ModeQueue
-		proxyQueue = make(chan bool)
-		go dequeue()
 	}
 
 	Config.LfuTime = time.Duration(jsonData.LfuTime)
