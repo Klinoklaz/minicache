@@ -194,7 +194,7 @@ func countAccess(c *Cache, ctx context.Context) {
 		return
 	}
 
-	if c.status != invalid {
+	if c.status == invalid {
 		return
 	}
 
