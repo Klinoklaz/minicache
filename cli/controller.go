@@ -30,30 +30,32 @@ func SendCmd() {
 
 	scn := bufio.NewScanner(os.Stdin)
 	monitoring := false
+	quit := false
+	// used as break and continue
+	brk := make(chan bool, 1)
+	ctn := make(chan bool, 1)
 
 	fmt.Print("> ")
-	for scn.Scan() {
+	for !quit && scn.Scan() {
 		_, err := conn.Write(append(scn.Bytes(), ' ')) // never write empty bytes
 		if err != nil {
 			util.Log(util.LogErr, "failed sending command. #%s", err)
 			return
 		}
-		// can't have multiple getRes() calls simultaneously
-		// because it blocks on conn.Read()
 		if monitoring {
-			continue
-		}
-		if scn.Text() == "monitor" {
-			monitoring = true
-			go func() {
-				for getRes(conn) {
-				}
-				monitoring = false
-			}()
-		} else if getRes(conn) {
-			fmt.Print("> ")
+			monitoring = false
 		} else {
-			break
+			if scn.Text() == "monitor" {
+				monitoring = true
+				ctn <- true // continue accepting input immediately
+			}
+			go getRes(conn, brk, ctn)
+		}
+		// flow control
+		select {
+		case <-brk:
+			quit = true
+		case <-ctn:
 		}
 	}
 	if scn.Err() != nil {
@@ -61,28 +63,32 @@ func SendCmd() {
 	}
 }
 
-func getRes(conn net.Conn) bool {
-	n, err := conn.Read(cliBuf)
-	// normally server side connection is closed at first
-	if err == io.EOF {
-		fmt.Println("\nbye.")
-		return false
+func getRes(conn net.Conn, brk, ctn chan<- bool) {
+	for {
+		n, err := conn.Read(cliBuf)
+		if err != nil {
+			// normally server side connection is closed first
+			if err == io.EOF {
+				fmt.Println("\nbye.")
+			} else {
+				util.Log(util.LogErr, "failed getting command results. #%s", err)
+			}
+			brk <- true
+			return
+		}
+		_, err = os.Stdout.Write(cliBuf[:n])
+		if err != nil {
+			util.Log(util.LogErr, "failed outputting command results. #%s", err)
+			brk <- true
+			return
+		}
+		// current cmd done, continue the outer loop
+		if cliBuf[n-1] == '\x00' {
+			fmt.Print("> ")
+			ctn <- true
+			return
+		}
 	}
-	if err != nil {
-		util.Log(util.LogErr, "failed getting command results. #%s", err)
-		return false
-	}
-	_, err = os.Stdout.Write(cliBuf[:n])
-	if err != nil {
-		util.Log(util.LogErr, "failed outputting command results. #%s", err)
-		return false
-	}
-	// break monitor loop
-	if cliBuf[n-1] == '\x00' {
-		fmt.Print("> ")
-		return false
-	}
-	return true
 }
 
 // the server side of the cli tool
@@ -126,8 +132,8 @@ listen:
 				util.Log(util.LogDebug, "monitoring end.")
 				util.SetLogWriter(oldLog)
 				util.Config.LogLevel = oldLevel
+				cmd[0] = ""
 				monitoring = false
-				cmd[0] = "esc"
 			}
 
 			// process command
@@ -140,21 +146,25 @@ listen:
 				_, err = cache.Show(conn, cmd[1])
 			case "reload":
 				_, err = reload(conn, cmd[1])
-			case "esc":
-				_, err = conn.Write([]byte{'\x00'})
 			case "monitor":
 				monitoring = true
 				oldLevel, oldLog = monitor(conn)
 				util.Log(util.LogDebug, "monitoring begin.")
+				continue
 			case "quit", "q":
 				conn.Close()
 				continue listen
-			default:
-				_, err = conn.Write([]byte{'\n'})
 			}
 
 			if err != nil {
 				util.Log(util.LogErr, "failed sending command results. #%s", err)
+				conn.Close()
+				continue listen
+			}
+			// notice client the cmd processing is completed
+			_, err = conn.Write([]byte{'\x00'})
+			if err != nil {
+				util.Log(util.LogErr, "failed sending the zero byte. #%s", err)
 				conn.Close()
 				continue listen
 			}

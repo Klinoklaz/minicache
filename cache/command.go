@@ -47,7 +47,7 @@ func Show(conn net.Conn, key string) (int, error) {
 	return fmt.Fprintf(conn, "Content size:\t%.2f%s\n"+
 		"Headers:\t%d\n"+
 		"Status:\t\t%c\n"+
-		"Access Count:\t%d\n"+
+		"Access count:\t%d\n"+
 		"Hash:\t\t%s\n"+
 		"Protected at:\t%s\n"+
 		"All URIs:\t%s\n"+
@@ -94,8 +94,8 @@ func List(conn net.Conn) (int, error) {
 
 	for k, c := range cachePool.pool {
 		size, unit := humanReadableSize(len(c.Content))
-		m, err := fmt.Fprintf(conn, "%.2f%s\t\t%c\t%d\t%s\n",
-			size, unit, c.status, c.accessCnt, k)
+		m, err := fmt.Fprintf(conn, "%-16s%c\t%d\t%s\n",
+			fmt.Sprintf("%.2f%s", size, unit), c.status, c.accessCnt, k)
 		n += m
 		if err != nil {
 			return n, err
