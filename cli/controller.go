@@ -45,9 +45,9 @@ func SendCmd() {
 		if monitoring {
 			monitoring = false
 		} else {
-			if scn.Text() == "monitor" {
+			if t := scn.Text(); t == "monitor" || t == "m" {
 				monitoring = true
-				ctn <- true // continue accepting input immediately
+				ctn <- true // continue accepting input while monitoring
 			}
 			go getRes(conn, brk, ctn)
 		}
@@ -138,15 +138,17 @@ listen:
 
 			// process command
 			switch cmd[0] {
-			case "status":
+			case "status", "s":
 				_, err = cache.Status(conn)
-			case "list":
+			case "list", "l":
 				_, err = cache.List(conn)
-			case "show":
+			case "show", "o":
 				_, err = cache.Show(conn, cmd[1])
-			case "reload":
+			case "help", "h":
+				_, err = help(conn)
+			case "reload", "r":
 				_, err = reload(conn, cmd[1])
-			case "monitor":
+			case "monitor", "m":
 				monitoring = true
 				oldLevel, oldLog = monitor(conn)
 				util.Log(util.LogDebug, "monitoring begin.")
@@ -159,14 +161,14 @@ listen:
 			if err != nil {
 				util.Log(util.LogErr, "failed sending command results. #%s", err)
 				conn.Close()
-				continue listen
+				break
 			}
 			// notice client the cmd processing is completed
 			_, err = conn.Write([]byte{'\x00'})
 			if err != nil {
 				util.Log(util.LogErr, "failed sending the zero byte. #%s", err)
 				conn.Close()
-				continue listen
+				break
 			}
 		}
 	}
@@ -181,24 +183,4 @@ func getCmd(conn net.Conn) []string {
 		return []string{"quit"}
 	}
 	return cmdSep.Split(strings.TrimSpace(string(srvBuf[:n])), 2)
-}
-
-// reloads config file
-func reload(conn net.Conn, newFile string) (int, error) {
-	if newFile == "" {
-		newFile = util.LastConfFile
-	}
-	cache.Block()
-	util.LoadConfFile(newFile, false)
-	cache.Unblock()
-	return fmt.Fprintf(conn, "config file loaded, current conf values: %+v\n", util.Config)
-}
-
-// prints debug log to cli tool, not concurrency-safe
-func monitor(conn net.Conn) (int, io.Writer) {
-	oldLevel := util.Config.LogLevel
-	util.Config.LogLevel = util.LogDebug
-	oldLog := util.GetLogWriter()
-	util.SetLogWriter(io.MultiWriter(oldLog, conn))
-	return oldLevel, oldLog
 }
