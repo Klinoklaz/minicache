@@ -13,11 +13,7 @@ import (
 	"github.com/klinoklaz/minicache/util"
 )
 
-var (
-	srvBuf = make([]byte, 2048) // server side read
-	cliBuf = make([]byte, 2048) // client side read
-	cmdSep = regexp.MustCompile(`\s+`)
-)
+const fin byte = '\x00'
 
 // the client side of the cli tool
 func SendCmd() {
@@ -64,31 +60,32 @@ func SendCmd() {
 }
 
 func getRes(conn net.Conn, brk, ctn chan<- bool) {
+	var buf = make([]byte, 2048)
+	var err error
+	var op string
+	var n int
 	for {
-		n, err := conn.Read(cliBuf)
-		if err != nil {
-			// normally server side connection is closed first
-			if err == io.EOF {
-				fmt.Println("\nbye.")
-			} else {
-				util.Log(util.LogErr, "failed getting command results. #%s", err)
-			}
-			brk <- true
-			return
+		if n, err = conn.Read(buf); err != nil {
+			op = "getting"
+			break
 		}
-		_, err = os.Stdout.Write(cliBuf[:n])
-		if err != nil {
-			util.Log(util.LogErr, "failed outputting command results. #%s", err)
-			brk <- true
-			return
+		if _, err = os.Stdout.Write(buf[:n]); err != nil {
+			op = "outputting"
+			break
 		}
 		// current cmd done, continue the outer loop
-		if cliBuf[n-1] == '\x00' {
+		if buf[n-1] == fin {
 			fmt.Print("> ")
 			ctn <- true
 			return
 		}
 	}
+	if err == io.EOF { // server side connection closed
+		fmt.Println("\nbye.")
+	} else {
+		util.Log(util.LogErr, "failed %s command results. #%s", op, err)
+	}
+	brk <- true
 }
 
 // the server side of the cli tool
@@ -157,30 +154,33 @@ listen:
 				conn.Close()
 				continue listen
 			}
-
-			if err != nil {
-				util.Log(util.LogErr, "failed sending command results. #%s", err)
-				conn.Close()
-				break
-			}
 			// notice client the cmd processing is completed
-			_, err = conn.Write([]byte{'\x00'})
+			if err == nil {
+				_, err = conn.Write([]byte{fin})
+			}
 			if err != nil {
-				util.Log(util.LogErr, "failed sending the zero byte. #%s", err)
 				conn.Close()
+				util.Log(util.LogErr, "failed sending command results. #%s", err)
 				break
 			}
 		}
 	}
 }
 
+// getCmd() doesn't run in separate goroutine
+// so it's safe to use globals
+var (
+	cmdBuf = make([]byte, 2048)
+	cmdSep = regexp.MustCompile(`\s+`)
+)
+
 func getCmd(conn net.Conn) []string {
-	n, err := conn.Read(srvBuf)
+	n, err := conn.Read(cmdBuf)
 	if err != nil {
 		if err != io.EOF {
 			util.Log(util.LogErr, "failed getting command. #%s", err)
 		}
 		return []string{"quit"}
 	}
-	return cmdSep.Split(strings.TrimSpace(string(srvBuf[:n])), 2)
+	return cmdSep.Split(strings.TrimSpace(string(cmdBuf[:n])), 2)
 }
