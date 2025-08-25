@@ -51,6 +51,13 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 		case util.ModeCache: // no-op
 		}
 	}
+	// bypassing mechanism for auth related request
+	if util.Config.AllowAuth &&
+		(r.Header.Get("Authorization") != "" ||
+			r.Header.Get("Cookie") != "") {
+		util.Forward(w, r)
+		return
+	}
 
 	var res *http.Response
 	var c *cache.Cache

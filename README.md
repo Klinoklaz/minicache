@@ -13,7 +13,6 @@ Considering that a typical low-end hosting server priced below $5/mo has 512MB~1
 
 A few limitations to keep in mind:
 
-* Login, auth, cookies won't work because the corresponding headers are intentionally stripped off to prevent user-specific or privileged content being cached.
 * The cache size limit configuration doesn't count any space taken by cache keys (request URI) and cached response headers, which theoretically can be pretty large.
 * It doesn't distinguish between dynamic contents (usually html, js, css) and static files (jpg, zip), and will cache them all by default. This may not be preferable since caching static files takes huge amount of memory without much benefits. Additional setup (e.g., [with nginx](#example-with-nginx)) to serve static files directly is recommended.
 

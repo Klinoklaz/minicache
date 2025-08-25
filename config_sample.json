@@ -3,6 +3,7 @@
     "target_addr": "http://127.0.0.1:2323",
     "log_file": "",
     "log_level": "error",
+    "allow_auth": true,
     "cache_unique": true,
     "cache_mobile": true,
     "cache_size": 419430400,

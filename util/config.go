@@ -29,19 +29,36 @@ const (
 )
 
 type config struct {
-	LocalAddr        string        `json:"local_addr"`  // Local listening address
-	TargetAddr       string        `json:"target_addr"` // Proxy target
-	LogFile          string        `json:"log_file"`    // Specify a log destination
-	LogLevel         int           // Specify a log level: debug|info|warning|error
-	CacheUnique      bool          `json:"cache_unique"` // Deduplicate if different URLs return same response?
-	CacheMobile      bool          `json:"cache_mobile"` // Detect mobile UA and cache the responses separately?
-	CacheSize        int           `json:"cache_size"`   // Max cache size in bytes, default 1 GB
-	NonGetMode       int           // How to deal with non-GET requests: pass|block|cache
-	RefreshPw        string        `json:"refresh_password"` // Password used in request header defined by RefreshHeader to force a cache update
-	RefreshHeader    string        `json:"refresh_header"`   // Request header name to carry your refresh password
-	CliSocket        string        `json:"cli_socket"`       // Socket file for the cli tool
-	LfuTime          time.Duration // Track access count within this time period for each cache entry
-	ProtectionExpire time.Duration // Fresh requests will go stale and fall into LFU list after this much of time
+	LocalAddr  string `json:"local_addr"`  // Local listening address
+	TargetAddr string `json:"target_addr"` // Proxy target
+	LogFile    string `json:"log_file"`    // Specify a log destination
+	LogLevel   int    // Specify a log level: debug|info|warning|error
+	NonGetMode int    // How to deal with non-GET requests: pass|block|cache
+	CacheSize  int    `json:"cache_size"` // Max cache size in bytes, default 1 GB
+	CliSocket  string `json:"cli_socket"` // Socket file for the cli tool
+
+	// Bypass caching if Cookie or Authorization is presented in request headers?
+	// When set to false, both headers are stripped to prevent
+	// user-specific or privileged content being cached
+	AllowAuth bool `json:"allow_auth"`
+
+	// Deduplicate if different URLs return same response?
+	CacheUnique bool `json:"cache_unique"`
+
+	// Detect mobile UA and cache the responses separately?
+	CacheMobile bool `json:"cache_mobile"`
+
+	// Password used in request header defined by RefreshHeader to force a cache update
+	RefreshPw string `json:"refresh_password"`
+
+	// Request header name to carry your refresh password
+	RefreshHeader string `json:"refresh_header"`
+
+	// Track access count within this time period for each cache entry
+	LfuTime time.Duration
+
+	// Fresh requests will go stale and fall into LFU list after this much of time
+	ProtectionExpire time.Duration
 
 	// Timeouts reserved for dealing with theoretical slow request DoS
 
