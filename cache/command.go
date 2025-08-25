@@ -13,12 +13,12 @@ func humanReadableSize(bytes int) (float64, string) {
 	units := [4]string{"B", "KB", "MB", "GB"}
 	size := float64(bytes)
 	var i int
-	for i = range units {
-		base := 1 << (i * 10)
-		size = size / float64(base)
+	for i < 3 {
 		if size < 1024. {
 			break
 		}
+		i++
+		size /= 1024.
 	}
 	return size, units[i]
 }
