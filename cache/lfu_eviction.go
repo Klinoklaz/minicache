@@ -66,13 +66,13 @@ func lfuEvict() {
 		evictionQuota := cachePool.size - goal
 		protectList.unprotect(func(c *Cache) bool {
 			forceStale := evictionQuota > 0
-			evictionQuota -= len(c.Content)
+			evictionQuota -= len(c.Body)
 			return forceStale || time.Since(c.protectedAt) > util.Config.ProtectionExpire
 		})
 
 		// sort in access count desc, content length asc
 		slices.SortFunc(lfuList.li, func(a, b *Cache) int {
-			return b.accessCnt - a.accessCnt + len(a.Content) - len(b.Content)
+			return b.accessCnt - a.accessCnt + len(a.Body) - len(b.Body)
 		})
 
 		for cachePool.size > goal && len(lfuList.li) > 0 {
@@ -89,7 +89,7 @@ func lfuEvict() {
 			if util.Config.CacheUnique {
 				delete(cachePool.hashes, c.hash)
 			}
-			cachePool.size -= len(c.Content)
+			cachePool.size -= len(c.Body)
 			lfuList.li = lfuList.li[:len(lfuList.li)-1]
 
 			util.Log(util.LogDebug, "evicting cache entry. %s", c)

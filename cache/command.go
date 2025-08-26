@@ -32,7 +32,7 @@ func Show(conn net.Conn, key string) (int, error) {
 		return conn.Write([]byte{'\n'})
 	}
 
-	size, unit := humanReadableSize(len(c.Content))
+	size, unit := humanReadableSize(len(c.Body))
 
 	var pTime string
 	if !c.protectedAt.IsZero() {
@@ -93,7 +93,7 @@ func List(conn net.Conn) (int, error) {
 	defer cachePool.mtx.RUnlock()
 
 	for k, c := range cachePool.pool {
-		size, unit := humanReadableSize(len(c.Content))
+		size, unit := humanReadableSize(len(c.Body))
 		m, err := fmt.Fprintf(conn, "%-16s%c\t%d\t%s\n",
 			fmt.Sprintf("%.2f%s", size, unit), c.status, c.accessCnt, k)
 		n += m

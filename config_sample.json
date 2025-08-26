@@ -1,6 +1,6 @@
 {
     "local_addr": ":9999",
-    "target_addr": "http://127.0.0.1:2323",
+    "target": "http://127.0.0.1:2323",
     "log_file": "",
     "log_level": "error",
     "allow_auth": true,
