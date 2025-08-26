@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net/http"
 
 	"github.com/klinoklaz/minicache/cache"
@@ -9,12 +10,19 @@ import (
 	"github.com/klinoklaz/minicache/util"
 )
 
+const version = "v1.0.0"
+
 func main() {
 	var confFile string
-	var isCli bool
+	var isCli, showVersion bool
 	flag.StringVar(&confFile, "f", "", "Specify a config file")
 	flag.BoolVar(&isCli, "c", false, "Interactive cli tool")
+	flag.BoolVar(&showVersion, "v", false, "Display version number")
 	flag.Parse()
+	if showVersion {
+		fmt.Println(version)
+		return
+	}
 	if confFile != "" {
 		util.LoadConfFile(confFile, isCli)
 	}
@@ -51,7 +59,7 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 		case util.ModeCache: // no-op
 		}
 	}
-	// bypassing mechanism for auth related request
+	// bypassing mechanism for auth related requests
 	if util.Config.AllowAuth &&
 		(r.Header.Get("Authorization") != "" ||
 			r.Header.Get("Cookie") != "") {

@@ -37,7 +37,7 @@ type config struct {
 	CacheSize  int    `json:"cache_size"` // Max cache size in bytes, default 1 GB
 	CliSocket  string `json:"cli_socket"` // Socket file for the cli tool
 
-	// Bypass caching if Cookie or Authorization is presented in request headers?
+	// Bypass caching if Cookie or Authorization is presented in request headers? -
 	// When set to false, both headers are stripped to prevent
 	// user-specific or privileged content being cached.
 	// Note that some auth mechanisms like CSRF token validation may still break
