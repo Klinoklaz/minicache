@@ -60,7 +60,7 @@ func lfuEvict() {
 		protectList.mtx.Lock()
 		lfuList.mtx.Lock()
 
-		// evction won't work if we don't have enough entries in LFU list.
+		// eviction won't work if we don't have enough entries in LFU list.
 		// force a dequeue quota on protected list
 		// to guarantee at least this much of cache will be evicted
 		evictionQuota := cachePool.size - goal
@@ -79,6 +79,7 @@ func lfuEvict() {
 			c := lfuList.li[len(lfuList.li)-1]
 			// check if c was reprotected
 			if c.status == protect {
+				lfuList.li = lfuList.li[:len(lfuList.li)-1]
 				continue
 			}
 
