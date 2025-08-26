@@ -39,7 +39,9 @@ type config struct {
 
 	// Bypass caching if Cookie or Authorization is presented in request headers?
 	// When set to false, both headers are stripped to prevent
-	// user-specific or privileged content being cached
+	// user-specific or privileged content being cached.
+	// Note that some auth mechanisms like CSRF token validation may still break
+	// despite this option being turned on, due to the nature of reverse proxy
 	AllowAuth bool `json:"allow_auth"`
 
 	// Deduplicate if different URLs return same response?
