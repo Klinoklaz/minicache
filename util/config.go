@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/json"
+	"net/url"
 	"os"
 	"time"
 )
@@ -29,13 +30,14 @@ const (
 )
 
 type config struct {
-	LocalAddr  string `json:"local_addr"`  // Local listening address
-	TargetAddr string `json:"target_addr"` // Proxy target
-	LogFile    string `json:"log_file"`    // Specify a log destination
-	LogLevel   int    // Specify a log level: debug|info|warning|error
-	NonGetMode int    // How to deal with non-GET requests: pass|block|cache
-	CacheSize  int    `json:"cache_size"` // Max cache size in bytes, default 1 GB
-	CliSocket  string `json:"cli_socket"` // Socket file for the cli tool
+	LocalAddr  string   `json:"local_addr"` // Local listening address
+	Target     string   `json:"target"`     // Proxy target
+	TargetURL  *url.URL // Parse result of Target
+	LogFile    string   `json:"log_file"` // Specify a log destination
+	LogLevel   int      // Specify a log level: debug|info|warning|error
+	NonGetMode int      // How to deal with non-GET requests: pass|block|cache
+	CacheSize  int      `json:"cache_size"` // Max cache size in bytes, default 1 GB
+	CliSocket  string   `json:"cli_socket"` // Socket file for the cli tool
 
 	// Bypass caching if Cookie or Authorization is presented in request headers? -
 	// When set to false, both headers are stripped to prevent
@@ -118,6 +120,12 @@ func LoadConfFile(file string, isCli bool) {
 
 	if Config.LogFile != "" && !isCli {
 		setLogFile(Config.LogFile)
+	}
+	target, err := url.Parse(Config.Target)
+	if err == nil {
+		Config.TargetURL = target
+	} else {
+		Log(LogErr, "invalid target %s #%s", Config.Target, err)
 	}
 
 	switch jsonData.NonGetMode {

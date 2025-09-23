@@ -40,7 +40,7 @@ minicache -c -f /path/to/config.json
 ## Configuration
 Basic options:
 
-* `target_addr` - base part of the proxied site's url, e. g., _http://mydomain.com_
+* `target` - base part of the proxied site's url, e. g., _http://mydomain.com_
 * `local_addr` - _address:port_ or _:port_ alone of the proxy
 * `cache_unique` - cache only once if different URLs return same response when set to _true_
 * `cache_mobile` - detect mobile UA and cache the response separately when set to _true_
@@ -56,7 +56,7 @@ Refer to [config.go](./util/config.go) for a full list of configurations and des
 ## Example with nginx
 Proxy config:
 ```json
-{"local_addr": ":9999", "target_addr": "http://127.0.0.1:2323"}
+{"local_addr": ":9999", "target": "http://127.0.0.1:2323"}
 ```
 
 Nginx config:

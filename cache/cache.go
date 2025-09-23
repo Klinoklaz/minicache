@@ -6,9 +6,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -16,8 +14,9 @@ import (
 )
 
 type Cache struct {
-	Header  http.Header
-	Content []byte
+	Header     http.Header
+	Body       []byte
+	StatusCode int
 
 	ready       chan bool
 	keys        []string // cache pool key
@@ -32,7 +31,7 @@ func (c *Cache) String() string {
 		c.keys,
 		c.accessCnt,
 		c.status,
-		len(c.Content),
+		len(c.Body),
 		hex.EncodeToString(c.hash[:]),
 		c.protectedAt.Format(time.StampMicro))
 }
@@ -65,103 +64,80 @@ func Init() {
 	go lfuEvict()
 }
 
-func keygen(r *http.Request) string {
-	prefix := ""
-	if util.Config.NonGetMode == util.ModeCache {
-		prefix += r.Method + "_"
+func (c *Cache) RefreshResDataFrom(cc *Cache) {
+	if cc.status == invalid {
+		return
 	}
-	if util.Config.CacheMobile && strings.Contains(r.Header.Get("User-Agent"), "Mobi") {
-		prefix = "_" + prefix
-	}
-	return prefix + r.RequestURI
+
+	cachePool.mtx.Lock()
+	defer cachePool.mtx.Unlock()
+
+	cachePool.size += len(cc.Body) - len(c.Body)
+	c.Body = cc.Body
+	c.Header = cc.Header.Clone()
+	c.StatusCode = cc.StatusCode
+	// c.hash doesn't need to be updated
 }
 
-// forwads request to proxy target and fills up cache entry's fields using the response
-func (c *Cache) newRequest(r *http.Request) *http.Response {
-	c.status = fresh
-
-	r.Header.Del("Authorization")
-	r.Header.Del("Cookie")
-	res, err := util.DoRequest(r)
-	if err != nil {
-		c.status = invalid
-		util.Log(util.LogErr, "caching target unreachable, %s %s #%s", r.Method, r.RequestURI, err)
-		return nil
+func New(key string) *Cache {
+	return &Cache{
+		ready:      make(chan bool),
+		keys:       []string{key},
+		accessCnt:  1,
+		status:     fresh,
+		StatusCode: http.StatusOK,
 	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		c.status = invalid
-	}
-
-	c.accessCnt = 1
-	res.Header.Del("Set-Cookie")
-	res.Header.Del("Expires")
-	c.Header = res.Header.Clone()
-
-	c.Content, err = io.ReadAll(res.Body)
-	if err != nil {
-		c.status = invalid
-		util.Log(util.LogErr, "could not read response for caching, %s %s #%s", r.Method, r.RequestURI, err)
-	} else if util.Config.CacheUnique {
-		c.hash = md5.Sum(c.Content)
-	}
-
-	return res
 }
 
-// get cache entry
-func Get(r *http.Request) (*Cache, *http.Response) {
-	ctx := r.Context()
-	key := keygen(r)
-
+// retrieve cache entry from pool, or create a new one with empty data
+func GetCache(ctx context.Context, key string) (c *Cache, isNew bool) {
 	cachePool.mtx.RLock()
-	c := cachePool.pool[key]
+	c = cachePool.pool[key]
 
-	// can't && c.status != invalid here
+	// can't `&& c.status != invalid` here
 	// because it causes concurrent retry, which does no benefit
 	if c != nil {
 		cachePool.mtx.RUnlock()
 		countAccess(c, ctx)
-		return c, nil
+		return c, false
 	}
 
 	cachePool.mtx.RUnlock()
 	cachePool.mtx.Lock()
 
-	// check again since there's a time window in lock escalation
+	// check again since there's a time window in lock upgrade
 	c = cachePool.pool[key]
+	// already created by other concurrent reqest
 	if c != nil {
 		cachePool.mtx.Unlock()
 		countAccess(c, ctx)
-		return c, nil
+		return c, false
 	}
-
-	// first request or retry
-	c = &Cache{ready: make(chan bool), keys: []string{key}}
+	// first request
+	c = New(key)
 	cachePool.pool[key] = c
 	cachePool.mtx.Unlock()
 
-	res := c.newRequest(r)
+	return c, true
+}
 
-	if c.status != invalid {
-		accept(c)
-	} else {
+// do some post-processing according to c's final state
+func AcceptCache(c *Cache, key string) {
+	defer close(c.ready)
+
+	if c.status == invalid {
 		cachePool.mtx.Lock()
 		delete(cachePool.pool, key)
 		cachePool.mtx.Unlock()
+		return
 	}
-	close(c.ready)
 
-	return c, res
-}
-
-func accept(c *Cache) {
 	cachePool.mtx.Lock()
-	util.Log(util.LogDebug, "adding new cache entry: %s (%d)", c.keys[0], len(c.Content))
+	util.Log(util.LogDebug, "adding new cache entry: %s (%d, %d B)", c.keys[0], c.StatusCode, len(c.Body))
 
-	if cachePool.size += len(c.Content); cachePool.size > util.Config.CacheSize {
-		util.Log(util.LogDebug, "cache pool size limit reached, currently %d, try to start evicting.", cachePool.size)
+	if cachePool.size += len(c.Body); cachePool.size > util.Config.CacheSize {
+		util.Log(util.LogDebug,
+			"cache pool size limit reached, currently %d, try to start evicting.", cachePool.size)
 		go func() { cachePool.evictorWakeup <- true }()
 	}
 
@@ -171,11 +147,12 @@ func accept(c *Cache) {
 		return
 	}
 
+	c.hash = md5.Sum(c.Body)
 	// check hashes to ensure same response data being added only once to the pool
 	if cc, ok := cachePool.hashes[c.hash]; ok {
 		cachePool.pool[c.keys[0]] = cc
 		cc.keys = append(cc.keys, c.keys[0])
-		cachePool.size -= len(c.Content)
+		cachePool.size -= len(c.Body)
 		cachePool.mtx.Unlock()
 		util.Log(util.LogDebug, "found duplicated content for %s, merge into existing one. %s", c.keys[0], cc)
 	} else {
@@ -186,7 +163,7 @@ func accept(c *Cache) {
 }
 
 // don't put this inside cache pool's mutex section,
-// or it will create dead locks with accept()
+// or it will create dead locks with AcceptCache()
 func countAccess(c *Cache, ctx context.Context) {
 	select {
 	case <-c.ready:
