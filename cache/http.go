@@ -13,7 +13,11 @@ import (
 func GetKeyFromReqest(r *http.Request) string {
 	prefix := ""
 	if util.Config.NonGetMode == util.ModeCache {
-		prefix += r.Method + "_"
+		method := r.Method
+		if method == "HEAD" {
+			method = "GET"
+		}
+		prefix += method + "_"
 	}
 	if util.Config.CacheMobile && strings.Contains(r.Header.Get("User-Agent"), "Mobi") {
 		prefix = "_" + prefix
