@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/url"
 	"os"
 	"time"
@@ -30,14 +31,15 @@ const (
 )
 
 type config struct {
-	LocalAddr  string   `json:"local_addr"` // Local listening address
-	Target     string   `json:"target"`     // Proxy target
-	TargetURL  *url.URL // Parse result of Target
-	LogFile    string   `json:"log_file"` // Specify a log destination
-	LogLevel   int      // Specify a log level: debug|info|warning|error
-	NonGetMode int      // How to deal with non-GET requests: pass|block|cache
-	CacheSize  int      `json:"cache_size"` // Max cache size in bytes, default 1 GB
-	CliSocket  string   `json:"cli_socket"` // Socket file for the cli tool
+	LocalAddr   string   `json:"local_addr"` // Local listening address
+	Target      string   `json:"target"`     // Proxy target
+	TargetURL   *url.URL // Parse result of Target
+	LogFile     string   `json:"log_file"` // Specify a log destination
+	LogLevel    int      // Specify a log level: debug|info|warning|error
+	NonGetMode  int      // How to deal with non-GET requests: pass|block|cache
+	CacheSize   int      `json:"cache_size"`   // Max cache size in bytes, default 1 GB
+	CliSocket   string   `json:"cli_socket"`   // Socket file for the cli tool
+	CacheStatus []int    `json:"cache_status"` // Which response status codes are cacheable
 
 	// Bypass caching if Cookie or Authorization is presented in request headers? -
 	// When set to false, both headers are stripped to prevent
@@ -78,6 +80,7 @@ var Config config = config{
 	NonGetMode:       ModePass,
 	LfuTime:          30 * time.Minute,
 	ProtectionExpire: 30 * time.Minute,
+	CacheStatus:      []int{http.StatusOK},
 }
 
 var LastConfFile string

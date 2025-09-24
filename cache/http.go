@@ -25,24 +25,6 @@ func GetKeyFromReqest(r *http.Request) string {
 	return prefix + r.RequestURI
 }
 
-// this doesn't comply with definitions of "non-cacheable" in http RFCs,
-// only includes volatile statuses or those can cause errors if were cached
-/* var nonCacheableStatus = []int{
-	http.StatusContinue,
-	http.StatusSwitchingProtocols,
-	http.StatusProcessing,
-	http.StatusEarlyHints,
-	http.StatusCreated,
-	http.StatusAccepted,
-	http.StatusRequestTimeout,
-	http.StatusConflict,
-	http.StatusLocked,
-	http.StatusTooEarly,
-	http.StatusTooManyRequests,
-	http.StatusBadGateway,
-	http.StatusGatewayTimeout,
-}*/
-
 // wrap http.ResponseWriter for copying data into cache
 type ResponseWrapper struct {
 	w   http.ResponseWriter
@@ -66,7 +48,7 @@ func (rw *ResponseWrapper) Write(data []byte) (int, error) {
 
 func (rw *ResponseWrapper) WriteHeader(statusCode int) {
 	rw.w.WriteHeader(statusCode)
-	if statusCode != http.StatusOK {
+	if !slices.Contains(util.Config.CacheStatus, statusCode) {
 		rw.c.status = invalid
 		util.LogDebug("status not cacheable (%d), key: %s", statusCode, rw.c.keys[0])
 	}
