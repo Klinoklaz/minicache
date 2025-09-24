@@ -15,10 +15,14 @@ const (
 )
 
 func init() {
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
+	// special mark for messages from go internal packages or other dependencies
+	log.SetPrefix("[INTERNAL]")
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lmsgprefix)
 }
 
-// log application runtime info
+// use a different logger for application messages
+var appLogger = log.New(os.Stderr, "", log.Ldate|log.Ltime|log.Lmicroseconds)
+
 func doLog(level int, format string, a ...any) {
 	if level < Config.LogLevel {
 		return
@@ -38,10 +42,10 @@ func doLog(level int, format string, a ...any) {
 	}
 
 	if level >= LogLevelFatal {
-		log.Fatalf(format, a...)
+		appLogger.Fatalf(format, a...)
 	}
 
-	log.Printf(format, a...)
+	appLogger.Printf(format, a...)
 }
 
 func LogDebug(format string, a ...any) {
@@ -69,15 +73,16 @@ func setLogFile(name string) {
 	f, err := os.OpenFile(name, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 	if err == nil {
 		log.SetOutput(f)
+		appLogger.SetOutput(f)
 		return
 	}
 	LogWarn("can't open log file %s, logging destination won't be changed. #%s", name, err)
 }
 
 func GetLogWriter() io.Writer {
-	return log.Writer()
+	return appLogger.Writer()
 }
 
 func SetLogWriter(w io.Writer) {
-	log.SetOutput(w)
+	appLogger.SetOutput(w)
 }
