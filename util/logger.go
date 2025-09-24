@@ -80,9 +80,10 @@ func setLogFile(name string) {
 }
 
 func GetLogWriter() io.Writer {
-	return appLogger.Writer()
+	return log.Writer()
 }
 
 func SetLogWriter(w io.Writer) {
+	log.SetOutput(w)
 	appLogger.SetOutput(w)
 }

@@ -160,7 +160,7 @@ listen:
 			}
 			if err != nil {
 				conn.Close()
-				util.LogErr("failed sending command results. #%s", err)
+				util.LogErr("failed sending command results, %v #%s", cmd, err)
 				break
 			}
 		}
