@@ -133,11 +133,10 @@ func AcceptCache(c *Cache, key string) {
 	}
 
 	cachePool.mtx.Lock()
-	util.Log(util.LogDebug, "adding new cache entry: %s (%d, %d B)", c.keys[0], c.StatusCode, len(c.Body))
+	util.LogDebug("adding new cache entry: %s (%d, %d B)", c.keys[0], c.StatusCode, len(c.Body))
 
 	if cachePool.size += len(c.Body); cachePool.size > util.Config.CacheSize {
-		util.Log(util.LogDebug,
-			"cache pool size limit reached, currently %d, try to start evicting.", cachePool.size)
+		util.LogDebug("cache pool size limit reached, currently %d, try to start evicting.", cachePool.size)
 		go func() { cachePool.evictorWakeup <- true }()
 	}
 
@@ -154,7 +153,7 @@ func AcceptCache(c *Cache, key string) {
 		cc.keys = append(cc.keys, c.keys[0])
 		cachePool.size -= len(c.Body)
 		cachePool.mtx.Unlock()
-		util.Log(util.LogDebug, "found duplicated content for %s, merge into existing one. %s", c.keys[0], cc)
+		util.LogDebug("found duplicated content for %s, merge into existing one. %s", c.keys[0], cc)
 	} else {
 		cachePool.hashes[c.hash] = c
 		cachePool.mtx.Unlock()
@@ -188,7 +187,7 @@ func countAccess(c *Cache, ctx context.Context) {
 	// but kinda ok
 	if c.status != protect {
 		protectList.protect(c)
-		util.Log(util.LogDebug, "reprotect cache entry: %s", c)
+		util.LogDebug("reprotect cache entry: %s", c)
 	}
 	// there's no way to remove c from LFU list after reprotecting it
 	// since we don't know its index, this also leads to duplicated entries in LFU list.

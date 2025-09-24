@@ -19,6 +19,7 @@ func main() {
 	flag.BoolVar(&isCli, "c", false, "Interactive cli tool")
 	flag.BoolVar(&showVersion, "v", false, "Display version number")
 	flag.Parse()
+
 	if showVersion {
 		fmt.Println(version)
 		return

@@ -23,7 +23,7 @@ func reload(conn net.Conn, newFile string) (int, error) {
 // prints debug log to cli tool, not concurrency-safe
 func monitor(conn net.Conn) (int, io.Writer) {
 	oldLevel := util.Config.LogLevel
-	util.Config.LogLevel = util.LogDebug
+	util.Config.LogLevel = util.LogLevelDebug
 	oldLog := util.GetLogWriter()
 	util.SetLogWriter(io.MultiWriter(oldLog, conn))
 	return oldLevel, oldLog

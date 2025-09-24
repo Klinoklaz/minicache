@@ -68,9 +68,18 @@ func (rw *ResponseWrapper) WriteHeader(statusCode int) {
 	rw.w.WriteHeader(statusCode)
 	if statusCode != http.StatusOK {
 		rw.c.status = invalid
+		util.LogDebug("status not cacheable (%d), key: %s", statusCode, rw.c.keys[0])
 	}
 	rw.c.StatusCode = statusCode
 	rw.c.Header = rw.w.Header().Clone()
+}
+
+func (rw *ResponseWrapper) LogError() {
+	if rw.err != nil &&
+		!errors.Is(rw.err, syscall.EPIPE) &&
+		!errors.Is(rw.err, syscall.ECONNRESET) {
+		util.LogInfo("failed writing response when creating cache, key: %s #%s", rw.c.keys[0], rw.err)
+	}
 }
 
 func (c *Cache) WrapResponse(w http.ResponseWriter) *ResponseWrapper {
@@ -84,7 +93,10 @@ func (c *Cache) WriteResponse(w http.ResponseWriter) {
 	w.WriteHeader(c.StatusCode)
 
 	_, err := w.Write(c.Body)
-	if err != nil && !errors.Is(err, syscall.EPIPE) && !errors.Is(err, syscall.ECONNRESET) {
-		util.Log(util.LogInfo, "failed writing response, cache key: %s #%s", c.keys[0], err)
+	// write errors are mostly client error, not very important
+	if err != nil &&
+		!errors.Is(err, syscall.EPIPE) &&
+		!errors.Is(err, syscall.ECONNRESET) {
+		util.LogInfo("failed writing response, cache key: %s #%s", c.keys[0], err)
 	}
 }

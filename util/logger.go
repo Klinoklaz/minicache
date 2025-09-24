@@ -7,57 +7,77 @@ import (
 )
 
 const (
-	LogDebug = iota
-	LogInfo
-	LogWarn
-	LogErr
-	LogFatal
+	LogLevelDebug = iota
+	LogLevelInfo
+	LogLevelWarn
+	LogLevelErr
+	LogLevelFatal
 )
 
-var logger *log.Logger = log.New(os.Stderr, "", log.Ldate|log.Ltime|log.Lmicroseconds)
+func init() {
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
+}
 
-func Log(level int, format string, a ...any) {
+// log application runtime info
+func doLog(level int, format string, a ...any) {
 	if level < Config.LogLevel {
 		return
 	}
 
 	switch level {
-	case LogDebug:
+	case LogLevelDebug:
 		format = "[DEBUG]" + format
-	case LogInfo:
+	case LogLevelInfo:
 		format = "[INFO]" + format
-	case LogWarn:
+	case LogLevelWarn:
 		format = "[WARNING]" + format
-	case LogErr:
+	case LogLevelErr:
 		format = "[ERROR]" + format
-	case LogFatal:
+	case LogLevelFatal:
 		format = "[FATAL]" + format
-	default:
-		format = "[UNKNOWN]" + format
 	}
 
-	if level >= LogFatal {
-		logger.Fatalf(format, a...)
+	if level >= LogLevelFatal {
+		log.Fatalf(format, a...)
 	}
 
-	logger.Printf(format, a...)
+	log.Printf(format, a...)
+}
+
+func LogDebug(format string, a ...any) {
+	doLog(LogLevelDebug, format, a...)
+}
+
+func LogInfo(format string, a ...any) {
+	doLog(LogLevelInfo, format, a...)
+}
+
+func LogWarn(format string, a ...any) {
+	doLog(LogLevelWarn, format, a...)
+}
+
+func LogErr(format string, a ...any) {
+	doLog(LogLevelErr, format, a...)
+}
+
+func LogFatal(format string, a ...any) {
+	doLog(LogLevelFatal, format, a...)
 }
 
 // not concurrency-safe
 func setLogFile(name string) {
 	f, err := os.OpenFile(name, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
-	if err != nil {
-		Log(LogWarn, "can't open log file %s, logging destination won't be changed. #%s", name, err)
+	if err == nil {
+		log.SetOutput(f)
 		return
 	}
-
-	logger.SetOutput(f)
+	LogWarn("can't open log file %s, logging destination won't be changed. #%s", name, err)
 }
 
 func GetLogWriter() io.Writer {
-	return logger.Writer()
+	return log.Writer()
 }
 
 func SetLogWriter(w io.Writer) {
-	logger.SetOutput(w)
+	log.SetOutput(w)
 }

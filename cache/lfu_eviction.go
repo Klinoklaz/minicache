@@ -45,7 +45,7 @@ func (p *protecting) unprotect(condition func(*Cache) bool) {
 		cc := p.li.Remove(c).(*Cache)
 		cc.status = stale
 		lfuList.li = append(lfuList.li, cc)
-		util.Log(util.LogDebug, "moving protected cache entry to LFU list. %s", cc)
+		util.LogDebug("moving protected cache entry to LFU list. %s", cc)
 	}
 }
 
@@ -92,7 +92,7 @@ func lfuEvict() {
 			cachePool.size -= len(c.Body)
 			lfuList.li = lfuList.li[:len(lfuList.li)-1]
 
-			util.Log(util.LogDebug, "evicting cache entry. %s", c)
+			util.LogDebug("evicting cache entry. %s", c)
 		}
 
 		cachePool.mtx.Unlock()

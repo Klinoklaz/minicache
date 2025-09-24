@@ -73,7 +73,7 @@ type config struct {
 
 var Config config = config{
 	LocalAddr:        ":3456",
-	LogLevel:         LogWarn,
+	LogLevel:         LogLevelWarn,
 	CacheSize:        1 << 30,
 	NonGetMode:       ModePass,
 	LfuTime:          30 * time.Minute,
@@ -86,7 +86,7 @@ func LoadConfFile(file string, isCli bool) {
 	LastConfFile = file
 	data, err := os.ReadFile(file)
 	if err != nil {
-		Log(LogWarn, "can't read config file %s, default config values will be used. #%s", file, err)
+		LogWarn("can't read config file %s, default config values will be used. #%s", file, err)
 		return
 	}
 
@@ -103,19 +103,19 @@ func LoadConfFile(file string, isCli bool) {
 
 	err = json.Unmarshal(data, &jsonData)
 	if err != nil {
-		Log(LogWarn, "invalid config file %s, default config values will be used. #%s", file, err)
+		LogWarn("invalid config file %s, default config values will be used. #%s", file, err)
 		return
 	}
 
 	switch jsonData.LogLevel {
 	case "debug":
-		Config.LogLevel = LogDebug
+		Config.LogLevel = LogLevelDebug
 	case "info":
-		Config.LogLevel = LogInfo
+		Config.LogLevel = LogLevelInfo
 	case "warning":
-		Config.LogLevel = LogWarn
+		Config.LogLevel = LogLevelWarn
 	case "error":
-		Config.LogLevel = LogErr
+		Config.LogLevel = LogLevelErr
 	}
 
 	if Config.LogFile != "" && !isCli {
@@ -125,7 +125,7 @@ func LoadConfFile(file string, isCli bool) {
 	if err == nil {
 		Config.TargetURL = target
 	} else {
-		Log(LogErr, "invalid target %s #%s", Config.Target, err)
+		LogErr("invalid target %s #%s", Config.Target, err)
 	}
 
 	switch jsonData.NonGetMode {
@@ -143,5 +143,5 @@ func LoadConfFile(file string, isCli bool) {
 	Config.WriteTimeout = time.Duration(jsonData.WriteTimeout)
 	Config.ProtectionExpire = time.Duration(jsonData.ProtectionExpire)
 
-	Log(LogInfo, "config file loaded, current conf values: %+v", Config)
+	LogInfo("config file loaded, current conf values: %+v", Config)
 }

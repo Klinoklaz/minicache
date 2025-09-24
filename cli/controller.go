@@ -19,7 +19,7 @@ const fin byte = '\x00'
 func SendCmd() {
 	conn, err := net.Dial("unix", util.Config.CliSocket)
 	if err != nil {
-		util.Log(util.LogErr, "failed connecting to cli tool. #%s", err)
+		util.LogErr("failed connecting to cli tool. #%s", err)
 		return
 	}
 	defer conn.Close()
@@ -35,7 +35,7 @@ func SendCmd() {
 	for !quit && scn.Scan() {
 		_, err := conn.Write(append(scn.Bytes(), ' ')) // never write empty bytes
 		if err != nil {
-			util.Log(util.LogErr, "failed sending command. #%s", err)
+			util.LogErr("failed sending command. #%s", err)
 			return
 		}
 		if monitoring {
@@ -55,7 +55,7 @@ func SendCmd() {
 		}
 	}
 	if scn.Err() != nil {
-		util.Log(util.LogErr, "invalid cli input. #%s", scn.Err())
+		util.LogErr("invalid cli input. #%s", scn.Err())
 	}
 }
 
@@ -83,7 +83,7 @@ func getRes(conn net.Conn, brk, ctn chan<- bool) {
 	if err == io.EOF { // server side connection closed
 		fmt.Println("\nbye.")
 	} else {
-		util.Log(util.LogErr, "failed %s command results. #%s", op, err)
+		util.LogErr("failed %s command results. #%s", op, err)
 	}
 	brk <- true
 }
@@ -91,14 +91,14 @@ func getRes(conn net.Conn, brk, ctn chan<- bool) {
 // the server side of the cli tool
 func Listen() {
 	if util.Config.CliSocket == "" {
-		util.Log(util.LogInfo, "cli tool disabled.")
+		util.LogInfo("cli tool disabled.")
 		return
 	}
 
 	os.Remove(util.Config.CliSocket) // error ignored
 	l, err := net.Listen("unix", util.Config.CliSocket)
 	if err != nil {
-		util.Log(util.LogErr, "failed launching cli tool at %s. #%s", util.Config.CliSocket, err)
+		util.LogErr("failed launching cli tool at %s. #%s", util.Config.CliSocket, err)
 		return
 	}
 
@@ -112,7 +112,7 @@ listen:
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			util.Log(util.LogErr, "cli connection broke. #%s", err)
+			util.LogErr("cli connection broke. #%s", err)
 			continue
 		}
 		for {
@@ -126,7 +126,7 @@ listen:
 			}
 			// abort monitoring and restore logging config if there's any input
 			if monitoring {
-				util.Log(util.LogDebug, "monitoring end.")
+				util.LogDebug("monitoring end.")
 				util.SetLogWriter(oldLog)
 				util.Config.LogLevel = oldLevel
 				cmd[0] = ""
@@ -148,7 +148,7 @@ listen:
 			case "monitor", "m":
 				monitoring = true
 				oldLevel, oldLog = monitor(conn)
-				util.Log(util.LogDebug, "monitoring begin.")
+				util.LogDebug("monitoring begin.")
 				continue
 			case "quit", "q":
 				conn.Close()
@@ -160,7 +160,7 @@ listen:
 			}
 			if err != nil {
 				conn.Close()
-				util.Log(util.LogErr, "failed sending command results. #%s", err)
+				util.LogErr("failed sending command results. #%s", err)
 				break
 			}
 		}
@@ -178,7 +178,7 @@ func getCmd(conn net.Conn) []string {
 	n, err := conn.Read(cmdBuf)
 	if err != nil {
 		if err != io.EOF {
-			util.Log(util.LogErr, "failed getting command. #%s", err)
+			util.LogErr("failed getting command. #%s", err)
 		}
 		return []string{"quit"}
 	}

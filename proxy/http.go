@@ -17,9 +17,9 @@ func StartHTTPServer() {
 		WriteTimeout: util.Config.WriteTimeout,
 	}
 
-	util.Log(util.LogInfo, "starting server at %s, targeting %s", util.Config.LocalAddr, util.Config.Target)
+	util.LogInfo("starting server at %s, targeting %s", util.Config.LocalAddr, util.Config.Target)
 	err := server.ListenAndServe()
-	util.Log(util.LogFatal, "failed starting http proxy server. #%s", err)
+	util.LogFatal("failed starting http proxy server. #%s", err)
 }
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
@@ -87,13 +87,15 @@ func getCache(w http.ResponseWriter, r *http.Request) {
 		c.WriteResponse(w)
 		return
 	}
-	cacheProxy.ServeHTTP(c.WrapResponse(w), r)
+	ww := c.WrapResponse(w)
+	cacheProxy.ServeHTTP(ww, r)
+	ww.LogError()
 	cache.AcceptCache(c, key)
 }
 
 func refreshCache(w http.ResponseWriter, r *http.Request) {
 	key := cache.GetKeyFromReqest(r)
-	util.Log(util.LogDebug, "refreshing cache entry: %s", key)
+	util.LogDebug("refreshing cache entry: %s", key)
 
 	// the problem with refreshing is, if there is any error,
 	// we can not simply remove c from cache pool when it's referenced
@@ -101,7 +103,9 @@ func refreshCache(w http.ResponseWriter, r *http.Request) {
 	// so we pass a new one into the proxy, then copy cc's data
 	// into c if the whole request is successful
 	cc := cache.New(key)
-	cacheProxy.ServeHTTP(cc.WrapResponse(w), r)
+	ww := cc.WrapResponse(w)
+	cacheProxy.ServeHTTP(ww, r)
+	ww.LogError()
 
 	c, isNew := cache.GetCache(r.Context(), key)
 	if isNew {
@@ -110,5 +114,5 @@ func refreshCache(w http.ResponseWriter, r *http.Request) {
 	} else {
 		c.RefreshResDataFrom(cc)
 	}
-	util.Log(util.LogDebug, "cache entry updated: %s", c)
+	util.LogDebug("cache entry updated: %s", c)
 }
