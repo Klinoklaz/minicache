@@ -79,6 +79,13 @@ func (c *Cache) RefreshFrom(cc *Cache) {
 	// c.hash doesn't need to be updated
 }
 
+// shallow copy
+func (c *Cache) CopyFrom(cc *Cache) {
+	r := c.ready
+	*c = *cc
+	c.ready = r
+}
+
 func New(key string) *Cache {
 	return &Cache{
 		ready:      make(chan bool),

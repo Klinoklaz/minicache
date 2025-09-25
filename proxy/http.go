@@ -88,6 +88,8 @@ func getCache(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	util.LogDebug("cache miss, fetching upstream: %s", key)
+	defer c.HandleProxyPanic()
+
 	ww := c.WrapResponse(w)
 	cacheProxy.ServeHTTP(ww, r)
 	ww.LogError()
@@ -104,13 +106,15 @@ func refreshCache(w http.ResponseWriter, r *http.Request) {
 	// so we pass a new one into the proxy, then copy cc's data
 	// into c if the whole request is successful
 	cc := cache.New(key)
+	defer cc.HandleProxyPanic()
+
 	ww := cc.WrapResponse(w)
 	cacheProxy.ServeHTTP(ww, r)
 	ww.LogError()
 
 	c, isNew := cache.GetCache(r.Context(), key)
 	if isNew {
-		*c = *cc
+		c.CopyFrom(cc)
 		cache.FinalizeNewCache(c, key)
 	} else {
 		c.RefreshFrom(cc)

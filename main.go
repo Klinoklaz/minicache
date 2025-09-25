@@ -10,7 +10,7 @@ import (
 	"github.com/klinoklaz/minicache/util"
 )
 
-const version = "v1.1.3"
+const version = "v1.1.4" // TODO: probably should use ldflags
 
 func main() {
 	var confFile string
