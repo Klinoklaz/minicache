@@ -130,10 +130,12 @@ func LoadConfFile(file string, isCli bool) {
 	target, err := url.Parse(Config.Target)
 	// tolerate error on config reloading,
 	// can't simply terminate program if target is invalid
-	if err == nil {
+	if err == nil && target.Scheme != "" && target.Host != "" {
 		Config.TargetURL = target
+	} else if err != nil {
+		LogErr("invalid proxy target %s #%s", Config.Target, err)
 	} else {
-		LogErr("invalid target %s #%s", Config.Target, err)
+		LogErr("invalid or empty proxy target %s", Config.Target)
 	}
 
 	switch jsonData.NonGetMode {
