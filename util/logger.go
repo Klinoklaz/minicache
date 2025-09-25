@@ -60,6 +60,7 @@ func LogWarn(format string, a ...any) {
 	doLog(LogLevelWarn, format, a...)
 }
 
+// convention: use '#%s' at the end of format to display an error variable
 func LogErr(format string, a ...any) {
 	doLog(LogLevelErr, format, a...)
 }
@@ -83,6 +84,7 @@ func GetLogWriter() io.Writer {
 	return log.Writer()
 }
 
+// not concurrency-safe, special use only
 func SetLogWriter(w io.Writer) {
 	log.SetOutput(w)
 	appLogger.SetOutput(w)

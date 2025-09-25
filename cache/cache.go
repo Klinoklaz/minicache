@@ -47,7 +47,7 @@ const (
 var cachePool struct {
 	pool          map[string]*Cache
 	size          int
-	mtx           sync.RWMutex
+	mtx           sync.RWMutex        // see lfuEvict() for lock order
 	hashes        map[[16]byte]*Cache // stores content md5 sum in deduplicate mode
 	evictorWakeup chan bool
 }
@@ -64,7 +64,7 @@ func Init() {
 	go lfuEvict()
 }
 
-func (c *Cache) RefreshResDataFrom(cc *Cache) {
+func (c *Cache) RefreshFrom(cc *Cache) {
 	if cc.status == invalid {
 		return
 	}
@@ -122,7 +122,7 @@ func GetCache(ctx context.Context, key string) (c *Cache, isNew bool) {
 }
 
 // do some post-processing according to c's final state
-func AcceptCache(c *Cache, key string) {
+func FinalizeNewCache(c *Cache, key string) {
 	defer close(c.ready)
 
 	if c.status == invalid {
@@ -162,7 +162,7 @@ func AcceptCache(c *Cache, key string) {
 }
 
 // don't put this inside cache pool's mutex section,
-// or it will create dead locks with AcceptCache()
+// or it will create dead locks with FinalizeNewEntry()
 func countAccess(c *Cache, ctx context.Context) {
 	select {
 	case <-c.ready:

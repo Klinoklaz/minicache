@@ -10,7 +10,7 @@ import (
 	"github.com/klinoklaz/minicache/util"
 )
 
-func GetKeyFromReqest(r *http.Request) string {
+func GetKeyFromRequest(r *http.Request) string {
 	prefix := ""
 	if util.Config.NonGetMode == util.ModeCache {
 		method := r.Method
@@ -32,10 +32,12 @@ type ResponseWrapper struct {
 	err error
 }
 
+// implement http.ResponseWriter
 func (rw *ResponseWrapper) Header() http.Header {
 	return rw.w.Header()
 }
 
+// implement http.ResponseWriter
 func (rw *ResponseWrapper) Write(data []byte) (int, error) {
 	rw.c.Body = slices.Concat(rw.c.Body, data)
 	// suppress the orginal error to ensure response body
@@ -46,11 +48,12 @@ func (rw *ResponseWrapper) Write(data []byte) (int, error) {
 	return len(data), nil
 }
 
+// implement http.ResponseWriter
 func (rw *ResponseWrapper) WriteHeader(statusCode int) {
 	rw.w.WriteHeader(statusCode)
 	if !slices.Contains(util.Config.CacheStatus, statusCode) {
 		rw.c.status = invalid
-		util.LogDebug("status not cacheable (%d), key: %s", statusCode, rw.c.keys[0])
+		util.LogDebug("status not cacheable (%d): %s", statusCode, rw.c.keys[0])
 	}
 	rw.c.StatusCode = statusCode
 	rw.c.Header = rw.w.Header().Clone()
@@ -60,7 +63,7 @@ func (rw *ResponseWrapper) LogError() {
 	if rw.err != nil &&
 		!errors.Is(rw.err, syscall.EPIPE) &&
 		!errors.Is(rw.err, syscall.ECONNRESET) {
-		util.LogInfo("failed writing response when creating cache, key: %s #%s", rw.c.keys[0], rw.err)
+		util.LogInfo("failed writing response when creating cache: %s #%s", rw.c.keys[0], rw.err)
 	}
 }
 
@@ -70,7 +73,7 @@ func (c *Cache) WrapResponse(w http.ResponseWriter) *ResponseWrapper {
 
 func (c *Cache) WriteResponse(w http.ResponseWriter) {
 	for h := range c.Header {
-		w.Header().Add(h, c.Header.Get(h))
+		w.Header().Set(h, c.Header.Get(h))
 	}
 	w.WriteHeader(c.StatusCode)
 

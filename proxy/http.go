@@ -81,20 +81,21 @@ var cacheProxy = httputil.ReverseProxy{
 }
 
 func getCache(w http.ResponseWriter, r *http.Request) {
-	key := cache.GetKeyFromReqest(r)
+	key := cache.GetKeyFromRequest(r)
 	c, isNew := cache.GetCache(r.Context(), key)
 	if !isNew {
 		c.WriteResponse(w)
 		return
 	}
+	util.LogDebug("cache miss, fetching upstream: %s", key)
 	ww := c.WrapResponse(w)
 	cacheProxy.ServeHTTP(ww, r)
 	ww.LogError()
-	cache.AcceptCache(c, key)
+	cache.FinalizeNewCache(c, key)
 }
 
 func refreshCache(w http.ResponseWriter, r *http.Request) {
-	key := cache.GetKeyFromReqest(r)
+	key := cache.GetKeyFromRequest(r)
 	util.LogDebug("refreshing cache entry: %s", key)
 
 	// the problem with refreshing is, if there is any error,
@@ -110,9 +111,9 @@ func refreshCache(w http.ResponseWriter, r *http.Request) {
 	c, isNew := cache.GetCache(r.Context(), key)
 	if isNew {
 		*c = *cc
-		cache.AcceptCache(c, key)
+		cache.FinalizeNewCache(c, key)
 	} else {
-		c.RefreshResDataFrom(cc)
+		c.RefreshFrom(cc)
 	}
 	util.LogDebug("cache entry updated: %s", c)
 }

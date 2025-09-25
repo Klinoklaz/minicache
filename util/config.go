@@ -33,7 +33,7 @@ const (
 type config struct {
 	LocalAddr   string   `json:"local_addr"` // Local listening address
 	Target      string   `json:"target"`     // Proxy target
-	TargetURL   *url.URL // Parse result of Target
+	TargetURL   *url.URL // Parsing result of Target
 	LogFile     string   `json:"log_file"` // Specify a log destination
 	LogLevel    int      // Specify a log level: debug|info|warning|error
 	NonGetMode  int      // How to deal with non-GET requests: pass|block|cache
@@ -66,13 +66,16 @@ type config struct {
 	// Fresh requests will go stale and fall into LFU list after this much of time
 	ProtectionExpire time.Duration
 
-	// Timeouts reserved for dealing with theoretical slow request DoS
+	// Timeouts reserved for dealing with theoretical slow request DoS,
+	// these won't be affected by config reload
 
 	IdleTimeout  time.Duration // Corresponds to http.Server.IdleTimeout
 	ReadTimeout  time.Duration // Corresponds to http.Server.ReadTimeout
 	WriteTimeout time.Duration // Corresponds to http.Server.WriteTimeout
 }
 
+// use an exported global for simplicity,
+// most fields shouldn't be arbitrarily modified during runtime
 var Config config = config{
 	LocalAddr:        ":3456",
 	LogLevel:         LogLevelWarn,
@@ -125,6 +128,8 @@ func LoadConfFile(file string, isCli bool) {
 		setLogFile(Config.LogFile)
 	}
 	target, err := url.Parse(Config.Target)
+	// tolerate error on config reloading,
+	// can't simply terminate program if target is invalid
 	if err == nil {
 		Config.TargetURL = target
 	} else {
@@ -146,5 +151,5 @@ func LoadConfFile(file string, isCli bool) {
 	Config.WriteTimeout = time.Duration(jsonData.WriteTimeout)
 	Config.ProtectionExpire = time.Duration(jsonData.ProtectionExpire)
 
-	LogInfo("config file loaded, current conf values: %+v", Config)
+	LogInfo("config file loaded, current config values: %+v", Config)
 }
