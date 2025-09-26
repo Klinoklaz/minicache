@@ -70,6 +70,10 @@ var cacheProxy = httputil.ReverseProxy{
 	Director: func(r *http.Request) {
 		r.Header.Del("Authorization")
 		r.Header.Del("Cookie")
+		// avoid caching empty body
+		if r.Method == "HEAD" {
+			r.Method = "GET"
+		}
 		r.URL.Scheme = util.Config.TargetURL.Scheme
 		r.URL.Host = util.Config.TargetURL.Host
 	},
