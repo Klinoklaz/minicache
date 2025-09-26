@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -86,14 +87,14 @@ var Config config = config{
 	CacheStatus:      []int{http.StatusOK},
 }
 
+// useful in config reloading
 var LastConfFile string
 
-func LoadConfFile(file string, isCli bool) {
+func LoadConfFile(file string, isCli bool) error {
 	LastConfFile = file
 	data, err := os.ReadFile(file)
 	if err != nil {
-		LogWarn("can't read config file %s, default config values will be used. #%s", file, err)
-		return
+		return fmt.Errorf("read config: %w", err)
 	}
 
 	jsonData := struct {
@@ -109,8 +110,7 @@ func LoadConfFile(file string, isCli bool) {
 
 	err = json.Unmarshal(data, &jsonData)
 	if err != nil {
-		LogWarn("invalid config file %s, default config values will be used. #%s", file, err)
-		return
+		return fmt.Errorf("parse file %s: %w", file, err)
 	}
 
 	switch jsonData.LogLevel {
@@ -154,4 +154,5 @@ func LoadConfFile(file string, isCli bool) {
 	Config.ProtectionExpire = time.Duration(jsonData.ProtectionExpire)
 
 	LogInfo("config file loaded, current config values: %+v", Config)
+	return nil
 }

@@ -14,10 +14,16 @@ func reload(conn net.Conn, newFile string) (int, error) {
 	if newFile == "" {
 		newFile = util.LastConfFile
 	}
+
 	cache.Block()
-	util.LoadConfFile(newFile, false)
+	err := util.LoadConfFile(newFile, false)
 	cache.Unblock()
-	return fmt.Fprintf(conn, "config file loaded, current conf values: %+v\n", util.Config)
+
+	if err == nil {
+		util.LogWarn("failed loading config file. #%s", err)
+		return fmt.Fprintf(conn, "nothing changed: %+v\n", util.Config)
+	}
+	return fmt.Fprintf(conn, "reload ok, current configurations: %+v\n", util.Config)
 }
 
 // prints debug log to cli tool, not concurrency-safe

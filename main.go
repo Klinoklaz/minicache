@@ -24,9 +24,13 @@ func main() {
 		fmt.Println(version)
 		return
 	}
-	if confFile != "" {
-		util.LoadConfFile(confFile, isCli)
+
+	if confFile == "" {
+		util.LogFatal("no config file provided, exiting")
+	} else if err := util.LoadConfFile(confFile, isCli); err != nil {
+		util.LogWarn("failed loading config file, using default values. #%s", err)
 	}
+
 	if isCli {
 		cli.SendCmd()
 		return
