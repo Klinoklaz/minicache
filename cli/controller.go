@@ -138,7 +138,7 @@ listen:
 			case "status", "s":
 				_, err = cache.Status(conn)
 			case "list", "l":
-				_, err = cache.List(conn)
+				_, err = cache.List(conn, cmd[1])
 			case "show", "o":
 				_, err = cache.Show(conn, cmd[1])
 			case "help", "h":
