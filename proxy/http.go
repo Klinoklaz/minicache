@@ -44,7 +44,7 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// a password carried by custom header can be used to force update the cache
+	// a password carried by custom header can be used to force-update the cache
 	if util.Config.RefreshHeader != "" &&
 		util.Config.RefreshPw != "" &&
 		r.Header.Get(util.Config.RefreshHeader) == util.Config.RefreshPw {
@@ -63,6 +63,11 @@ var directProxy = httputil.ReverseProxy{
 
 // sends request directly to proxy target, bypass caching
 func forward(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if err := recover(); err != nil {
+			util.LogErr("upstream connection may be broken (forwarding %s) #%v", r.RequestURI, err)
+		}
+	}()
 	directProxy.ServeHTTP(w, r)
 }
 
