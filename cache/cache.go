@@ -189,7 +189,8 @@ func countAccess(c *Cache, ctx context.Context) {
 		return
 	}
 
-	c.accessCnt = 1
+	c.accessCnt = 1 // restart counting
+	c.protectedAt = time.Now()
 	// NOTE: race, potentially can cause duplicated entries in the list,
 	// but kinda ok
 	if c.status != protect {
