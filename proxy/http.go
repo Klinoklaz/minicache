@@ -1,8 +1,11 @@
 package proxy
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httputil"
+	"time"
 
 	"github.com/klinoklaz/minicache/cache"
 	"github.com/klinoklaz/minicache/util"
@@ -23,6 +26,12 @@ func StartHTTPServer() {
 }
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithDeadlineCause(r.Context(),
+		time.Now().Add(util.Config.TargetTimeout),
+		errors.New("target timeout"))
+	defer cancel()
+	*r = *r.WithContext(ctx)
+
 	// check if non-get requests need to be treated differently
 	if r.Method != "GET" && r.Method != "HEAD" {
 		switch util.Config.NonGetMode {

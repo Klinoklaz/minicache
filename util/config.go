@@ -64,8 +64,11 @@ type config struct {
 	// Track access count within this time period for each cache entry
 	LfuTime time.Duration
 
-	// Fresh requests will go stale and fall into LFU list after this much of time
+	// Fresh requests will go stale and fall into LFU list after this amount of time
 	ProtectionExpire time.Duration
+
+	// Cancel proxy request if target doesn't respond within this amount of time
+	TargetTimeout time.Duration
 
 	// Timeouts reserved for dealing with theoretical slow request DoS,
 	// these won't be affected by config reload
@@ -84,6 +87,7 @@ var Config config = config{
 	NonGetMode:       ModePass,
 	LfuTime:          30 * time.Minute,
 	ProtectionExpire: 30 * time.Minute,
+	TargetTimeout:    15 * time.Second,
 	CacheStatus:      []int{http.StatusOK},
 }
 
@@ -106,6 +110,7 @@ func LoadConfFile(file string, isCli bool) error {
 		IdleTimeout      duration `json:"idle_timeout"`
 		ReadTimeout      duration `json:"read_timeout"`
 		WriteTimeout     duration `json:"write_timeout"`
+		TargetTimeout    duration `json:"target_timeout"`
 	}{config: &Config}
 
 	err = json.Unmarshal(data, &jsonData)
@@ -147,11 +152,19 @@ func LoadConfFile(file string, isCli bool) error {
 		Config.NonGetMode = ModeCache
 	}
 
-	Config.LfuTime = time.Duration(jsonData.LfuTime)
 	Config.IdleTimeout = time.Duration(jsonData.IdleTimeout)
 	Config.ReadTimeout = time.Duration(jsonData.ReadTimeout)
 	Config.WriteTimeout = time.Duration(jsonData.WriteTimeout)
-	Config.ProtectionExpire = time.Duration(jsonData.ProtectionExpire)
+	// avoid overriding default if not set
+	if jsonData.LfuTime > 0 {
+		Config.LfuTime = time.Duration(jsonData.LfuTime)
+	}
+	if jsonData.TargetTimeout > 0 {
+		Config.TargetTimeout = time.Duration(jsonData.TargetTimeout)
+	}
+	if jsonData.ProtectionExpire > 0 {
+		Config.ProtectionExpire = time.Duration(jsonData.ProtectionExpire)
+	}
 
 	LogInfo("config file loaded, current config values: %+v", Config)
 	return nil
