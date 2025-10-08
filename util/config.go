@@ -70,6 +70,13 @@ type config struct {
 	// Cancel proxy request if target doesn't respond within this amount of time
 	TargetTimeout time.Duration
 
+	// TargetRateLimit[0] specifies minimum interval
+	// between each request sent to target in millisecond,
+	// 0 (default) as well as any negative number means no limit;
+	// TargetRateLimit[1] specifies maximum waiting connections,
+	// 0 (default) as well as any negative number means no limit
+	TargetRateLimit [2]int `json:"target_rate_limit"`
+
 	// Timeouts reserved for dealing with theoretical slow request DoS,
 	// these won't be affected by config reload
 
