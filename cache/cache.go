@@ -18,22 +18,22 @@ type Cache struct {
 	Body       []byte
 	StatusCode int
 
-	ready       chan bool
-	keys        []string // cache pool key
-	accessCnt   int
-	hash        [16]byte
-	status      byte
-	protectedAt time.Time
+	ready     chan bool
+	keys      []string // cache pool key
+	accessCnt int
+	hash      [16]byte
+	status    byte
+	cntBegin  time.Time
 }
 
 func (c *Cache) String() string {
-	return fmt.Sprintf("URIs: %v, access count: %d, status: %c, content length: %d, hash: %s, protected at: %s",
+	return fmt.Sprintf("URIs: %v, access count: %d, status: %c, content length: %d, hash: %s, counting began: %s",
 		c.keys,
 		c.accessCnt,
 		c.status,
 		len(c.Body),
 		hex.EncodeToString(c.hash[:]),
-		c.protectedAt.Format(time.StampMicro))
+		c.cntBegin.Format(time.StampMicro))
 }
 
 // cache entry status
@@ -93,6 +93,7 @@ func New(key string) *Cache {
 		accessCnt:  1,
 		status:     fresh,
 		StatusCode: http.StatusOK,
+		cntBegin:   time.Now(),
 	}
 }
 
@@ -181,16 +182,14 @@ func countAccess(c *Cache, ctx context.Context) {
 		return
 	}
 
-	// use protectedAt as starting point of the counting period makes sense
-	// because its first value is very close to the creation time of c.
 	// access count doesn't need to be accurate, so no locking on individual entry
-	if time.Since(c.protectedAt) <= util.Config.LfuTime {
+	if time.Since(c.cntBegin) <= util.Config.LfuTime {
 		c.accessCnt++
 		return
 	}
 
 	c.accessCnt = 1 // restart counting
-	c.protectedAt = time.Now()
+	c.cntBegin = time.Now()
 	// NOTE: race, potentially can cause duplicated entries in the list,
 	// but kinda ok
 	if c.status != protect {

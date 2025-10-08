@@ -22,7 +22,6 @@ type evicting struct {
 // protect cache entry from LFU eviction.
 // don't put this inside cache pool's mutex section
 func (p *protecting) protect(c *Cache) {
-	c.protectedAt = time.Now()
 	c.status = protect
 
 	p.mtx.Lock()
@@ -67,7 +66,7 @@ func lfuEvict() {
 		protectList.unprotect(func(c *Cache) bool {
 			forceStale := evictionQuota > 0
 			evictionQuota -= len(c.Body)
-			return forceStale || time.Since(c.protectedAt) > util.Config.ProtectionExpire
+			return forceStale || time.Since(c.cntBegin) > util.Config.ProtectionExpire
 		})
 
 		// sort in access count desc, content length asc

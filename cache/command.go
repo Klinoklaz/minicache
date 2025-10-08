@@ -35,10 +35,10 @@ func Show(conn net.Conn, key string) (int, error) {
 
 	size, unit := humanReadableSize(len(c.Body))
 
-	var pTime string
-	if !c.protectedAt.IsZero() {
-		pTime = c.protectedAt.Format(time.StampNano) +
-			" (" + time.Since(c.protectedAt).String() + ")"
+	var cntTime string
+	if !c.cntBegin.IsZero() {
+		cntTime = c.cntBegin.Format(time.StampNano) +
+			" (" + time.Since(c.cntBegin).String() + ")"
 	}
 	unescaped := make([]string, len(c.keys))
 	for j, s := range c.keys {
@@ -50,8 +50,8 @@ func Show(conn net.Conn, key string) (int, error) {
 		"Status code:\t%d\n"+
 		"Status:\t\t%c\n"+
 		"Access count:\t%d\n"+
+		"Counting began:\t%s\n"+
 		"Hash:\t\t%s\n"+
-		"Protected at:\t%s\n"+
 		"All URIs:\t%s\n"+
 		"Unescaped URIs:\t%s\n",
 		size, unit,
@@ -59,8 +59,8 @@ func Show(conn net.Conn, key string) (int, error) {
 		c.StatusCode,
 		c.status,
 		c.accessCnt,
+		cntTime,
 		hex.EncodeToString(c.hash[:]),
-		pTime,
 		strings.Join(c.keys, "\n\t\t"),
 		strings.Join(unescaped, "\n\t\t"))
 }
@@ -115,13 +115,13 @@ func List(conn net.Conn, arg string) (int, error) {
 		cmp = func(a, b *Cache) int { return b.accessCnt - a.accessCnt }
 	case orderBy == "f" && limit < 0: // access frequency asc
 		cmp = func(a, b *Cache) int {
-			return a.accessCnt/int(time.Since(a.protectedAt).Seconds()) -
-				b.accessCnt/int(time.Since(b.protectedAt).Seconds())
+			return a.accessCnt/int(time.Since(a.cntBegin).Seconds()) -
+				b.accessCnt/int(time.Since(b.cntBegin).Seconds())
 		}
 	default: // access frequency desc
 		cmp = func(a, b *Cache) int {
-			return b.accessCnt/int(time.Since(b.protectedAt).Seconds()) -
-				a.accessCnt/int(time.Since(a.protectedAt).Seconds())
+			return b.accessCnt/int(time.Since(b.cntBegin).Seconds()) -
+				a.accessCnt/int(time.Since(a.cntBegin).Seconds())
 		}
 	}
 
