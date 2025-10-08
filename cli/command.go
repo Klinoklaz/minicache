@@ -19,8 +19,8 @@ func reload(conn net.Conn, newFile string) (int, error) {
 	err := util.LoadConfFile(newFile, false)
 	cache.Unblock()
 
-	if err == nil {
-		util.LogWarn("failed loading config file. #%s", err)
+	if err != nil {
+		util.LogErr("failed loading config file. #%s", err)
 		return fmt.Fprintf(conn, "nothing changed: %+v\n", util.Config)
 	}
 	return fmt.Fprintf(conn, "reload ok, current configurations: %+v\n", util.Config)
