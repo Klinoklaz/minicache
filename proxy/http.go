@@ -105,7 +105,7 @@ func getCache(w http.ResponseWriter, r *http.Request) {
 		c.WriteResponse(w)
 		return
 	}
-	util.LogDebug("cache miss, fetching upstream: %s", key)
+	util.LogDebug("cache miss, fetching upstream: %s -> %s", r.RemoteAddr, key)
 	defer c.HandleProxyPanic()
 
 	ww := c.WrapResponse(w)
