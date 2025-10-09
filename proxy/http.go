@@ -105,7 +105,7 @@ func forward(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	limiter()
-	util.LogDebug("bypass caching: %s -> %s %s", r.RemoteAddr, r.Method, r.RequestURI)
+	util.LogDebug("bypass caching: %s -> %s %s", util.GetRealIP(r), r.Method, r.RequestURI)
 	directProxy.ServeHTTP(w, r)
 }
 
@@ -136,7 +136,7 @@ func getCache(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limiter()
-	util.LogDebug("cache miss, fetching upstream: %s -> %s", r.RemoteAddr, key)
+	util.LogDebug("cache miss, fetching upstream: %s -> %s", util.GetRealIP(r), key)
 	defer c.HandleProxyPanic()
 
 	ww := c.WrapResponse(w)

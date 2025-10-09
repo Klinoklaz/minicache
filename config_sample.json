@@ -6,7 +6,7 @@
     "allow_auth": true,
     "cache_unique": true,
     "cache_mobile": true,
-    "cache_size": 419430400,
+    "cache_size": "400m",
     "cache_status": [200, 301],
     "non_get_mode": "pass",
     "lfu_time": "60m",

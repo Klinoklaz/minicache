@@ -38,7 +38,7 @@ type config struct {
 	LogFile     string   `json:"log_file"` // Specify a log destination
 	LogLevel    int      // Specify a log level: debug|info|warning|error
 	NonGetMode  int      // How to deal with non-GET requests: pass|block|cache
-	CacheSize   int      `json:"cache_size"`   // Max cache size in bytes, default 1 GB
+	CacheSize   int      // Max cache size, default 1 GB
 	CliSocket   string   `json:"cli_socket"`   // Socket file for the cli tool
 	CacheStatus []int    `json:"cache_status"` // Which response status codes are cacheable
 
@@ -112,6 +112,7 @@ func LoadConfFile(file string, isCli bool) error {
 		*config
 		LogLevel         string   `json:"log_level"`
 		NonGetMode       string   `json:"non_get_mode"`
+		CacheSize        string   `json:"cache_size"`
 		LfuTime          duration `json:"lfu_time"`
 		ProtectionExpire duration `json:"protection_expire"`
 		IdleTimeout      duration `json:"idle_timeout"`
@@ -123,6 +124,11 @@ func LoadConfFile(file string, isCli bool) error {
 	err = json.Unmarshal(data, &jsonData)
 	if err != nil {
 		return fmt.Errorf("parse file %s: %w", file, err)
+	}
+
+	// convert size limit to number of bytes
+	if cs := ParseByteSize(jsonData.CacheSize); cs > 0 {
+		Config.CacheSize = cs
 	}
 
 	switch jsonData.LogLevel {

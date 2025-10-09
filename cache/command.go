@@ -8,21 +8,9 @@ import (
 	"slices"
 	"strings"
 	"time"
-)
 
-func humanReadableSize(bytes int) (float64, string) {
-	units := [4]string{"B", "KB", "MB", "GB"}
-	size := float64(bytes)
-	var i int
-	for i < 3 {
-		if size < 1024. {
-			break
-		}
-		i++
-		size /= 1024.
-	}
-	return size, units[i]
-}
+	"github.com/klinoklaz/minicache/util"
+)
 
 // prints comprehensive cache entry info for the cli tool
 func Show(conn net.Conn, key string) (int, error) {
@@ -33,7 +21,7 @@ func Show(conn net.Conn, key string) (int, error) {
 		return conn.Write([]byte{'\n'})
 	}
 
-	size, unit := humanReadableSize(len(c.Body))
+	size, unit := util.ByteSize(len(c.Body))
 
 	var cntTime string
 	if !c.cntBegin.IsZero() {
@@ -68,7 +56,7 @@ func Show(conn net.Conn, key string) (int, error) {
 // prints info about cache pool for cli tool
 func Status(conn net.Conn) (int, error) {
 	cachePool.mtx.RLock()
-	size, unit := humanReadableSize(cachePool.size)
+	size, unit := util.ByteSize(cachePool.size)
 	n, err := fmt.Fprintf(conn, "Pool size:\t%.2f%s\n"+
 		"Keys:\t\t%d\n"+
 		"Hashes:\t\t%d\n"+
@@ -141,7 +129,7 @@ func List(conn net.Conn, arg string) (int, error) {
 		if i > limit {
 			break
 		}
-		size, unit := humanReadableSize(len(c.Body))
+		size, unit := util.ByteSize(len(c.Body))
 		m, err := fmt.Fprintf(conn, "%-16s%c\t%d\t%s\n",
 			fmt.Sprintf("%.2f%s", size, unit), c.status, c.accessCnt, c.keys[0])
 		n += m

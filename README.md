@@ -40,13 +40,13 @@ minicache -c -f /path/to/config.json
 ## Configuration
 Basic options:
 
-* `target` - base part of the proxied site's url, e. g., _http://mydomain.com_
+* `target` - base part of the proxied site's url, e.g., _http://mydomain.com_
 * `local_addr` - _address:port_ or _:port_ alone of the proxy
 * `cache_unique` - cache only once if different URLs return same response when set to _true_
 * `cache_mobile` - detect mobile UA and cache the response separately when set to _true_
-* `cache_size` - an integer that specifies cache size limit in bytes
-* `lfu_time` - the time interval to count cache access frequency, e. g., _1h, 1h30m,_ etc.
-* `protection_expire` - suggests how much time a cache entry should spend in FIFO queue (not strictly enforced), e. g., _1h, 1h30m,_ etc.
+* `cache_size` - cache size limit, e.g. _100MB, 100m_ etc.
+* `lfu_time` - the time interval to count cache access frequency, e.g., _1h, 1h30m,_ etc.
+* `protection_expire` - suggests how much time a cache entry should spend in FIFO queue (not strictly enforced), e.g., _1h, 1h30m,_ etc.
 * `refresh_header` - request header name for manual cache control
 * `refresh_password` - string value the cache control header should carry
 * `cli_socket` - socket file for the cli tool (it uses UNIX domain socket to communicate with the proxy process)
@@ -85,6 +85,7 @@ server {
         try_files $uri $uri/ /index.php$is_args$args;
     }
     location ~ \.php$ {
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_request_buffering off;
         proxy_redirect off;
         proxy_pass http://127.0.0.1:9999$request_uri;
