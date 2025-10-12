@@ -11,29 +11,7 @@ import (
 	"github.com/klinoklaz/minicache/util"
 )
 
-var (
-	bucket   = make(chan bool)              // leaky bucket
-	waiting  int                            // number of requests currenctly in the bucket
-	limiter  = func() {}                    // rate limiter
-	overflow = func() bool { return false } // determine if bucket capacity is exceeded
-)
-
 func StartHTTPServer() {
-	if util.Config.TargetRateLimit[0] > 0 {
-		go func() {
-			for {
-				waiting = 0
-				bucket <- true
-				time.Sleep(time.Duration(util.Config.TargetRateLimit[0]) * time.Millisecond)
-			}
-		}()
-		limiter = func() {
-			waiting++ // race, but accuracy isn't a big deal here
-			<-bucket
-		}
-		overflow = func() bool { return waiting > util.Config.TargetRateLimit[1] }
-	}
-
 	server := &http.Server{
 		Addr:         util.Config.LocalAddr,
 		Handler:      http.HandlerFunc(mainHandler),
@@ -48,11 +26,6 @@ func StartHTTPServer() {
 }
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
-	if overflow() {
-		w.WriteHeader(http.StatusTooManyRequests)
-		return
-	}
-
 	ctx, cancel := context.WithDeadlineCause(r.Context(),
 		time.Now().Add(util.Config.TargetTimeout),
 		errors.New("target timeout"))
@@ -104,7 +77,10 @@ func forward(w http.ResponseWriter, r *http.Request) {
 			util.LogErr("upstream connection may be broken (forwarding %s) #%v", r.RequestURI, err)
 		}
 	}()
-	limiter()
+	if util.RateLimit() {
+		w.WriteHeader(http.StatusTooManyRequests)
+		return
+	}
 	util.LogDebug("bypass caching: %s -> %s %s", util.GetRealIP(r), r.Method, r.RequestURI)
 	directProxy.ServeHTTP(w, r)
 }
@@ -135,10 +111,13 @@ func getCache(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limiter()
-	util.LogDebug("cache miss, fetching upstream: %s -> %s", util.GetRealIP(r), key)
-	defer c.HandleProxyPanic()
+	defer c.HandleProxyPanic(r)
+	if util.RateLimit() {
+		w.WriteHeader(http.StatusTooManyRequests)
+		panic(util.ErrRateLimited) // abort, trigger c.HandleProxyPanic()
+	}
 
+	util.LogDebug("cache miss, fetching upstream: %s -> %s", util.GetRealIP(r), key)
 	ww := c.WrapResponse(w)
 	cacheProxy.ServeHTTP(ww, r)
 	ww.LogError()
@@ -155,7 +134,7 @@ func refreshCache(w http.ResponseWriter, r *http.Request) {
 	// so we pass a new one into the proxy, then copy cc's data
 	// into c if the whole request is successful
 	cc := cache.New(key)
-	defer cc.HandleProxyPanic()
+	defer cc.HandleProxyPanic(r)
 
 	ww := cc.WrapResponse(w)
 	cacheProxy.ServeHTTP(ww, r)

@@ -175,6 +175,9 @@ func countAccess(c *Cache, ctx context.Context) {
 	select {
 	case <-c.ready:
 	case <-ctx.Done():
+		// have wrote several deadlocks around this logic,
+		// better add a warning
+		util.LogWarn("timeout while waiting for cache finalizing, key: %s", c.keys[0])
 		return
 	}
 

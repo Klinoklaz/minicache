@@ -42,7 +42,8 @@ type config struct {
 	CliSocket   string   `json:"cli_socket"`   // Socket file for the cli tool
 	CacheStatus []int    `json:"cache_status"` // Which response status codes are cacheable
 
-	// Bypass caching if Cookie or Authorization is presented in request headers? -
+	// Bypass caching if Cookie or Authorization is presented in request headers?
+	//
 	// When set to false, both headers are stripped to prevent
 	// user-specific or privileged content being cached.
 	// Note that some auth mechanisms like CSRF token validation may still break
@@ -70,12 +71,14 @@ type config struct {
 	// Cancel proxy request if target doesn't respond within this amount of time
 	TargetTimeout time.Duration
 
-	// TargetRateLimit[0] specifies minimum interval
-	// between each request sent to target in millisecond,
-	// 0 (default) as well as any negative number means no limit;
-	// TargetRateLimit[1] specifies maximum waiting connections,
-	// 0 (default) as well as any negative number means no limit
-	TargetRateLimit [2]int `json:"target_rate_limit"`
+	// Index 0: token bucket capacity
+	//
+	// Index 1: token refill rate (n token / sec)
+	//
+	// Index 2: max consecutive times the bucket can be drained
+	//
+	// Index 3: reduced token refill rate after detecting above condition
+	TargetRateLimit []int `json:"target_rate_limit"`
 
 	// Timeouts reserved for dealing with theoretical slow request DoS,
 	// these won't be affected by config reload
@@ -121,9 +124,12 @@ func LoadConfFile(file string, isCli bool) error {
 		TargetTimeout    duration `json:"target_timeout"`
 	}{config: &Config}
 
-	err = json.Unmarshal(data, &jsonData)
-	if err != nil {
+	if err = json.Unmarshal(data, &jsonData); err != nil {
 		return fmt.Errorf("parse file %s: %w", file, err)
+	}
+
+	if err = setRateLimit(); err != nil {
+		return err
 	}
 
 	// convert size limit to number of bytes

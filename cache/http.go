@@ -89,7 +89,7 @@ func (c *Cache) WriteResponse(w http.ResponseWriter) {
 // deal with panic thrown by httputil.ReverseProxy.ServeHTTP().
 // this basically does the same thing as setting c.status = invalid
 // then pass it into FinalizeNewCache()
-func (c *Cache) HandleProxyPanic() {
+func (c *Cache) HandleProxyPanic(r *http.Request) {
 	err := recover()
 	if err == nil {
 		return
@@ -100,5 +100,11 @@ func (c *Cache) HandleProxyPanic() {
 	cachePool.mtx.Unlock()
 
 	close(c.ready)
-	util.LogErr("upstream connection may be broken, was trying to fetch %s #%v", c.keys[0], err)
+
+	if e, ok := err.(error); ok && e == util.ErrRateLimited {
+		util.LogInfo("%s: %s -> %s", e, util.GetRealIP(r), c.keys[0])
+	} else {
+		util.LogErr("upstream connection may be broken: %s -> %s #%v",
+			util.GetRealIP(r), c.keys[0], err)
+	}
 }
