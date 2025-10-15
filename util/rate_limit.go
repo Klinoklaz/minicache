@@ -3,21 +3,24 @@ package util
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 )
 
+// 2-stage rate limiting, token bucket + adaptive refill rate
+type tokenBucket struct {
+	tokens        int
+	capacity      int
+	refillRate    int
+	counterSwitch bool // false == dump counter, true == fillup counter
+	dump          int  // consecutive times of draining
+	fillup        int  // consecutive times of filling up
+	mu            sync.Mutex
+	lastRefill    time.Time
+}
+
 var (
-	tokenBucket, bucketStat chan bool
-
-	// second limiter should be triggered only if
-	// the tokenBucket gets drained immediately after
-	// a refiller call for x consecutive times,
-	// so there must be a sync between second limiter and refiller
-	secondLimiterReady = make(chan bool, 1)
-
-	// recycle old refiller goroutine after reloading
-	refillerRC = make(chan bool)
-
+	bucket tokenBucket
 	// return true if the request is to be denied
 	RateLimit    = defaultLimit
 	defaultLimit = func() bool { return false } // default == no limit
@@ -25,10 +28,78 @@ var (
 	ErrRateLimited = errors.New("request denied by rate limiter")
 )
 
+func (tb *tokenBucket) rateLimit() bool {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
+
+	if d := time.Since(tb.lastRefill); d > 1*time.Second {
+		tb.refill(int(d.Seconds()))
+	}
+
+	if tb.tokens <= 0 {
+		return true
+	}
+	return !tb.takeToken()
+}
+
+func (tb *tokenBucket) refill(seconds int) {
+	tb.tokens += tb.refillRate * seconds
+	tb.lastRefill = time.Now()
+	if tb.tokens < tb.capacity {
+		tb.fillup = 0
+		return
+	}
+	// fillup
+	tb.tokens = tb.capacity
+	tb.dump = 0 // dump count becomes non-consecutive
+	if !tb.counterSwitch || len(Config.TargetRateLimit) != 4 {
+		return
+	}
+	// second limiter triggered,
+	// wait for a reversed condition (consecutively
+	// fill up the bucket for x times) to lift throttling
+	tb.fillup++
+	if tb.fillup < Config.TargetRateLimit[2] {
+		return
+	}
+	tb.fillup = 0 // reset and switch to dump counter
+	tb.counterSwitch = false
+	LogDebug("second limiter lifted, restore request quota %dr/s -> %dr/s",
+		tb.refillRate, Config.TargetRateLimit[1])
+	tb.refillRate = Config.TargetRateLimit[1]
+}
+
+func (tb *tokenBucket) takeToken() bool {
+	tb.tokens--
+	if tb.tokens > 0 {
+		return true
+	}
+	// drained
+	LogDebug("rate limit triggered (%dr/s), remaining quota %dr/s",
+		tb.capacity, tb.refillRate)
+	tb.fillup = 0 // fillup count becomes non-consecutive
+	if tb.counterSwitch || len(Config.TargetRateLimit) != 4 {
+		return false
+	}
+	// trigger second limiter if
+	// the bucket gets drained immediately after
+	// a non-filled-up refill() call for x consecutive times
+	tb.dump++
+	if tb.dump < Config.TargetRateLimit[2] {
+		return false
+	}
+	tb.dump = 0 // reset and switch to fillup counter
+	tb.counterSwitch = true
+	LogDebug("second limiter triggered, set request quota %dr/s -> %dr/s",
+		tb.refillRate, Config.TargetRateLimit[3])
+	tb.refillRate = Config.TargetRateLimit[3]
+	return false
+}
+
 func setRateLimit() error {
 	l := len(Config.TargetRateLimit)
-	if l == 0 { // not configured == no limit
-		recycleRefiller()
+	// not configured == no limit
+	if l == 0 {
 		RateLimit = defaultLimit
 		return nil
 	}
@@ -44,149 +115,13 @@ func setRateLimit() error {
 		}
 	}
 
-	tokenBucket = make(chan bool, Config.TargetRateLimit[0])
-	for range Config.TargetRateLimit[0] {
-		tokenBucket <- true
-	}
-	// 2-stage rate limiting:
-	// bucketStat will count the times of tokenBucket being drained
-	// or filled up, prepare for invoking the second limit rule
-	hasSndLmt := l == 4
-	if hasSndLmt {
-		bucketStat = make(chan bool, Config.TargetRateLimit[2])
-	}
+	bucket.mu.Lock()
+	defer bucket.mu.Unlock()
+	bucket.capacity = Config.TargetRateLimit[0]
+	bucket.tokens = bucket.capacity
+	bucket.refillRate = Config.TargetRateLimit[1]
 
-	RateLimit = getRateLimiter(getSecondLimiter(hasSndLmt))
-
-	recycleRefiller()
-	go getRefiller(getSecondUnlimiter(hasSndLmt))()
+	RateLimit = bucket.rateLimit
 
 	return nil
-}
-
-// degrade accessibility if bucket gets drained too frequently.
-// because our minimum goal is to put CPU usage under control,
-// we don't prioritize usability
-func getSecondLimiter(hasSecondLimiter bool) func() {
-	bucketCap := Config.TargetRateLimit[0]
-	newRefill := Config.TargetRateLimit[3]
-
-	if !hasSecondLimiter {
-		return func() {
-			LogDebug("rate limit triggered (%dr/s), remaining quota %dr/s",
-				bucketCap, Config.TargetRateLimit[1])
-		}
-	}
-
-	return func() {
-		select {
-		case secondLimiterReady <- true:
-		default:
-			return
-		}
-
-		LogDebug("first limiter triggered (%dr/s), remaining quota %dr/s",
-			bucketCap, Config.TargetRateLimit[1])
-
-		select {
-		case bucketStat <- true:
-		default:
-			for range Config.TargetRateLimit[2] {
-				select {
-				case v := <-bucketStat:
-					if !v {
-						return
-					}
-				default:
-					return
-				}
-			}
-			Config.TargetRateLimit[1] = newRefill
-			LogDebug("second limiter triggered, set request quota %dr/s -> %dr/s",
-				Config.TargetRateLimit[1], newRefill)
-		}
-	}
-}
-
-// if second limiter is triggered, wait for a reversed condition to lift penalty
-// (consecutively fill up the bucket for x times)
-func getSecondUnlimiter(hasSecondLimiter bool) func() {
-	if !hasSecondLimiter {
-		return func() {}
-	}
-
-	originalRefill := Config.TargetRateLimit[1]
-
-	return func() {
-		select {
-		case bucketStat <- false:
-		default:
-			for range Config.TargetRateLimit[2] {
-				select {
-				case v := <-bucketStat:
-					if v {
-						return
-					}
-				default:
-					return
-				}
-			}
-			currentRefill := Config.TargetRateLimit[1]
-			if currentRefill == originalRefill {
-				return
-			}
-
-			Config.TargetRateLimit[1] = originalRefill
-			LogDebug("second limiter lifted, request quota revert %dr/s -> %dr/s",
-				currentRefill, originalRefill)
-		}
-	}
-}
-
-func getRateLimiter(secondLimiter func()) func() bool {
-	return func() bool {
-		select {
-		case <-tokenBucket:
-			return false
-		default:
-			secondLimiter()
-			return true
-		}
-	}
-}
-
-// try to cancel existing refiller
-func recycleRefiller() {
-	select {
-	case refillerRC <- true:
-	default:
-	}
-}
-
-func getRefiller(unlimiter func()) func() {
-	return func() {
-		for {
-			select {
-			case <-refillerRC: // cancelled
-				return
-			default:
-			}
-
-			for range Config.TargetRateLimit[1] {
-				select {
-				case tokenBucket <- true:
-				default:
-					unlimiter()
-					tokenBucket <- true
-				}
-			}
-
-			select {
-			case <-secondLimiterReady:
-			default:
-			}
-
-			time.Sleep(1 * time.Second)
-		}
-	}
 }

@@ -77,7 +77,9 @@ type config struct {
 	//
 	// Index 2: max consecutive times the bucket can be drained
 	//
-	// Index 3: reduced token refill rate after detecting above condition
+	// Index 3: reduced token refill rate after detecting above condition.
+	// This panelty will be automatically lifted if the reversed condition (the
+	// bucket being consecutively filled up) is detected
 	TargetRateLimit []int `json:"target_rate_limit"`
 
 	// Timeouts reserved for dealing with theoretical slow request DoS,

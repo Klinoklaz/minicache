@@ -8,13 +8,14 @@ The main purpose is to help low-cost websites (scripting language backend + chea
 * Uses a customized version of 2Q algorithm (FIFO + LFU) as cache evicting policy
 * Manual control of cache update by sending a special header
 * A cli tool that can inspect details of the cache, reload config file without restarting, etc.
+* Adaptive token bucket rate limiting, useful for putting CPU usage under control when hit by recursive crawlers
 
 Considering that a typical low-end hosting server priced below $5/mo has 512MB~1GB of RAM, this caching proxy should work fine for a website containing a few thousand pages.
 
 A few limitations to keep in mind:
 
 * The cache size limit configuration doesn't count any space taken by cache keys (request URI) and cached response headers, which theoretically can be pretty large.
-* It doesn't distinguish between dynamic contents (usually html, js, css) and static files (jpg, zip), and will cache them all by default. This may not be preferable since caching static files takes huge amount of memory without much benefits. Additional setup (e.g., [with nginx](#example-with-nginx)) to serve static files directly is recommended.
+* It doesn't distinguish between dynamic contents (usually html, js, css) and static files (jpg, zip), and will cache everything by default. This may not be preferable since caching static files takes huge amounts of memory without much benefits. Additional setup (e.g., [with nginx](#example-with-nginx)) to serve static files directly is recommended.
 
 ## Usage
 To keep the proxy running on your server after logging out from ssh:
@@ -50,6 +51,7 @@ Basic options:
 * `refresh_header` - request header name for manual cache control
 * `refresh_password` - string value the cache control header should carry
 * `cli_socket` - socket file for the cli tool (it uses UNIX domain socket to communicate with the proxy process)
+* `target_rate_limit` - either in _[bucket capacity, refill rate]_ (simple token bucket) or _[bucket capacity, refill rate, penalty condition, penalty]_ (adaptive token bucket) format, or no rate limiting if not specified
 
 Refer to [config.go](./util/config.go) for a full list of configurations and descriptions.
 
