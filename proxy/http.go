@@ -5,6 +5,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httputil"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/klinoklaz/minicache/cache"
@@ -20,9 +23,23 @@ func StartHTTPServer() {
 		WriteTimeout: util.Config.WriteTimeout,
 	}
 
+	go func() {
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
+		<-sig
+
+		util.LogInfo("shutting down server")
+		ctx, cancel := context.WithDeadline(
+			context.Background(), time.Now().Add(5*time.Second))
+		defer cancel()
+		server.Shutdown(ctx)
+	}()
+
 	util.LogInfo("starting server at %s, targeting %s", util.Config.LocalAddr, util.Config.Target)
 	err := server.ListenAndServe()
-	util.LogFatal("failed starting http proxy server. #%s", err)
+	if err != http.ErrServerClosed {
+		util.LogFatal("failed starting http proxy server. #%s", err)
+	}
 }
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
