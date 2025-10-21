@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/klinoklaz/minicache/cache"
 	"github.com/klinoklaz/minicache/util"
@@ -89,7 +90,7 @@ func getRes(conn net.Conn, brk, ctn chan<- bool) {
 }
 
 // the server side of the cli tool
-func Listen() {
+func Listen(wg *sync.WaitGroup, exit <-chan os.Signal) {
 	if util.Config.CliSocket == "" {
 		util.LogInfo("cli tool disabled.")
 		return
@@ -102,12 +103,23 @@ func Listen() {
 		return
 	}
 
+	// Config.CliSocket can change after reloading,
+	// but actual listening socket is always the original one,
+	// it's better to pass it as a parameter
+	go func(socket string) {
+		<-exit
+		util.LogInfo("exiting cli tool")
+		os.Remove(socket)
+		wg.Done()
+	}(util.Config.CliSocket)
+
 	// the "monitor" operation takes indefinite time,
 	// so there must be a mechanism to abort it
 	var monitoring bool
 	var oldLevel int
 	var oldLog io.Writer
 
+	util.LogInfo("cli tool listening at %s", util.Config.CliSocket)
 listen:
 	for {
 		conn, err := l.Accept()

@@ -6,15 +6,13 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/klinoklaz/minicache/cache"
 	"github.com/klinoklaz/minicache/util"
 )
 
-func StartHTTPServer() {
+func StartHTTPServer(exit <-chan os.Signal) {
 	server := &http.Server{
 		Addr:         util.Config.LocalAddr,
 		Handler:      http.HandlerFunc(mainHandler),
@@ -24,13 +22,9 @@ func StartHTTPServer() {
 	}
 
 	go func() {
-		sig := make(chan os.Signal, 1)
-		signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
-		<-sig
-
+		<-exit
 		util.LogInfo("shutting down server")
-		ctx, cancel := context.WithDeadline(
-			context.Background(), time.Now().Add(5*time.Second))
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		server.Shutdown(ctx)
 	}()

@@ -3,6 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 
 	"github.com/klinoklaz/minicache/cache"
 	"github.com/klinoklaz/minicache/cli"
@@ -36,7 +40,20 @@ func main() {
 		return
 	}
 
-	go cli.Listen()
 	cache.Init()
-	proxy.StartHTTPServer()
+
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		<-shutdown
+		signal.Stop(shutdown)
+		close(shutdown) // broadcast shutdown event
+	}()
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go cli.Listen(wg, shutdown)
+	proxy.StartHTTPServer(shutdown)
+
+	wg.Wait()
 }
